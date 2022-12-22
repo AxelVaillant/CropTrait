@@ -40,6 +40,11 @@ function(input,output,session){
   traits<-dbGetQuery(con, trait_query)
   updatePickerInput(session, "dlTraits", choices = traits)
   
+  scale_query<-"SELECT DISTINCT info->>'traitmeas_scale' as traitmeas_scale FROM croptrait2  ORDER BY info->>'traitmeas_scale';"
+  scaleRes<-dbGetQuery(con, scale_query)
+  updatePickerInput(session, "scale", choices = scaleRes)
+  updatePickerInput(session, "dlScale", choices = scaleRes)
+  
   resTrait <<- dbGetQuery(conn = con,statement = traitQuery)
   resSpecies <<- dbGetQuery(conn = con,statement = taxonQuery)
   #resAll <<- dbGetQuery(conn = con,statement = AllDataQuery)
@@ -190,16 +195,18 @@ if((!input$taxon=="" && input$taxon %in% taxonTable[,1]) && is.null(input$sampli
   #############################-Download Data-############################
   ########################################################################
   dbManagement<- function(){
-      filterList<-""
+  filterList<-""
   inputList<-list(input$dlTaxon,input$scale,input$dlTraits,input$dlFunctional_group,input$dlSampling_type)
   inputNameList<-list("taxon","traitmeas_scale","trait_name","functio_group","sampling_type")
   for(i in 1:length(inputList)){
     if(!is.null(inputList[i][[1]]) &&  !inputList[i]==""){
       if(length(inputList[i][[1]]) >1){
         inputList[i][[1]]<-str_replace_all(toString(inputList[i][[1]])," ","")
-        inputList[i][[1]]<-sapply(strsplit(inputList[i][[1]],","), function(x) toString(sQuote(x)))
+        inputList[i][[1]]<-sapply(strsplit(inputList[i][[1]],","), function(x) toString(sQuote(x,F)))
         inputList[i][[1]]<-str_replace_all(inputList[i][[1]]," ","")
-      } else { inputList[i][[1]] <- sQuote(inputList[i][[1]])}
+      } else if (i == 1){
+        inputList[i][[1]]<-taxonHandler(inputList[i][[1]])
+      } else { inputList[i][[1]] <- sQuote(inputList[i][[1]],F)}
       filterList<-c(filterList,paste(" info ->>'",inputNameList[i],"' in (",inputList[i],")",sep=""))
     }
   }
@@ -213,13 +220,42 @@ if((!input$taxon=="" && input$taxon %in% taxonTable[,1]) && is.null(input$sampli
     
   
   observeEvent(input$runQuery,{
+    shinyjs::hide("queryDl")
+    withProgress(message="Browsing database",detail = "Please wait", value = 0,{
+      incProgress(1/5)
     filterList<-dbManagement()
-    AllDataQuery <- paste(readLines("/home/vaillant/Documents/Projets R/Projet CropTrait/CropTraits/Query.txt"), collapse="")
+    AllDataQuery <- paste(readLines("/home/vaillant/Documents/Projets R/Projet CropTrait/CropTraits/Query.txt"), collapse=" ")
     if(!filterList==""){
           filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"WHERE",filterList," ORDER BY info->>'id_bdd';",sep =" ")
           print(filteredQuery)
-    }
+    } else {filteredQuery<-AllDataQuery}
+    con <- dbConnect(RPostgres::Postgres(), dbname= "CropTrait", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
+    incProgress(1/2)
+    res <- dbGetQuery(conn = con,statement = filteredQuery)
+    dbDisconnect(con)
+    write.table(res,"queryRes.csv",sep = ";",row.names = FALSE)
+    uploadData()
+    })
+    shinyjs::show("queryDl")
   })
   
+  taxonHandler<-function(taxonInput){
+    nospace<-str_replace_all(taxonInput,", ",",")
+    splited<- strsplit(nospace,",")
+    editedTaxonInput<-sapply(splited, function(x) toString(sQuote(x,FALSE)))
+    return(editedTaxonInput)
+  }
+  #####################################################
+  ############### DOWNLOAD HANDLING ###################
+  uploadData <- function() {
+    output$queryDl <- downloadHandler(
+      filename = function() {
+        paste("Dataset-", Sys.time(), ".csv", sep="")
+      },
+      content = function(file) {
+        file.copy("queryRes.csv",file)
+      }
+    )
+  }
   
   }
