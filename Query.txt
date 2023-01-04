@@ -38,4 +38,4 @@ info ->>'trait_standardized_value'as trait_standardized_value,info ->>'trait_sta
 info ->>'plant_age'as plant_age,info ->>'plant_age_unit'as plant_age_unit,info ->>'trait_stage'as trait_stage,
 info ->>'trait_organ'as trait_organ,info ->>'trait_methods'as trait_methods,info ->>'replicate_number'as replicate_number,
 info ->>'std_value'as std_value,info ->>'std_unit'as std_unit,info ->>'metadata_remarks'as metadata_remarks
-from croptrait2;
+from croptrait;

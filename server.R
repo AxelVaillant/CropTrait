@@ -25,22 +25,26 @@ function(input,output,session){
   info ->>'subtaxa'as subtaxa,  info ->>'subtauthor'as subtauthor,  info ->>'variety'as variety,
   info ->>'crop_name'as crop_name,  info ->>'gen_name'as gen_name,info ->>'select_type'as select_type from croptrait LIMIT 1000;"
   
-      #####-Picker input-#####
-  functio_group_query<-"SELECT DISTINCT info->>'functio_group' as Fonctional_group FROM croptrait2  ORDER BY info->>'functio_group';"
+  ###-Selectize input-###
+  updateSelectizeInput(session, "taxons", choices = taxonTable)
+  
+  #####-Picker input-#####
+  functio_group_query<-"SELECT DISTINCT info->>'functio_group' as Fonctional_group FROM croptrait  ORDER BY info->>'functio_group';"
   functio_group<-dbGetQuery(con, functio_group_query)
   updatePickerInput(session, "Functional_group", choices = functio_group)
   updatePickerInput(session, "dlFunctional_group", choices = functio_group)
 
-  sampling_type_query<-"SELECT DISTINCT info->>'sampling_type' as Sampling_type FROM croptrait2  ORDER BY info->>'sampling_type';"
+  sampling_type_query<-"SELECT DISTINCT info->>'sampling_type' as Sampling_type FROM croptrait  ORDER BY info->>'sampling_type';"
   sampling_type<-dbGetQuery(con, sampling_type_query)
   updatePickerInput(session, "sampling_type", choices = sampling_type)
   updatePickerInput(session, "dlSampling_type", choices = sampling_type)
+  
 
-  trait_query<-"SELECT DISTINCT info->>'trait_name' as trait_name FROM croptrait2  ORDER BY info->>'trait_name';"
+  trait_query<-"SELECT DISTINCT info->>'trait_name' as trait_name FROM croptrait  ORDER BY info->>'trait_name';"
   traits<-dbGetQuery(con, trait_query)
   updatePickerInput(session, "dlTraits", choices = traits)
   
-  scale_query<-"SELECT DISTINCT info->>'traitmeas_scale' as traitmeas_scale FROM croptrait2  ORDER BY info->>'traitmeas_scale';"
+  scale_query<-"SELECT DISTINCT info->>'traitmeas_scale' as traitmeas_scale FROM croptrait  ORDER BY info->>'traitmeas_scale';"
   scaleRes<-dbGetQuery(con, scale_query)
   updatePickerInput(session, "scale", choices = scaleRes)
   updatePickerInput(session, "dlScale", choices = scaleRes)
@@ -103,67 +107,57 @@ function(input,output,session){
     points(GLOPNET$log.SLA ~ GLOPNET$log.Nmass, type="p", pch=20, col="grey")
       legend("topleft", "Glopnet",
        col="grey", pch=20, bty="n")
+      
+if(!is.null(input$taxons)){
+
+if(length(input$taxons)>1){
+  for(i in 1:length(input$taxons)){
+    plotLoop(input$taxons[i])
+  }
+} else {
+    plotLoop(input$taxons)
+  }}})
     
-if(!(is.null(input$sampling_type) && is.null(input$Functional_group) && !(!input$taxon=="" && input$taxon %in% taxonTable[,1]))){
+  plotLoop <- function(taxonList){
+       if(!(is.null(input$sampling_type) && is.null(input$Functional_group) && is.null(input$taxons))){
   
-if(is.null(input$sampling_type) && !is.null(input$Functional_group) && !(!input$taxon=="" && input$taxon %in% taxonTable[,1])){
+if(is.null(input$sampling_type) && !is.null(input$Functional_group) && is.null(input$taxons)){
   Sample<- resAll %>% filter(functio_group == input$Functional_group)
     traitSplit(Sample)
   points(SampleSLA$log.SLA ~ SampleLNC$log.LNC, type="p", pch=19, col="Red")
     legend("topleft", c("Glopnet",input$Functional_group),col=c("grey","red"), pch=20, bty="n")
 }
-if(!is.null(input$sampling_type) && is.null(input$Functional_group) && !(!input$taxon=="" && input$taxon %in% taxonTable[,1])){
+if(!is.null(input$sampling_type) && is.null(input$Functional_group) && is.null(input$taxons)){
   Sample<- resAll %>% filter(sampling_type == input$sampling_type)
     traitSplit(Sample)
   points(SampleSLA$log.SLA ~ SampleLNC$log.LNC, type="p", pch=19, col="Red")
     legend("topleft", c("Glopnet",input$sampling_type),col=c("grey","red"), pch=20, bty="n")
 }                     
-if(!is.null(input$sampling_type) && !is.null(input$Functional_group) && !(!input$taxon=="" && input$taxon %in% taxonTable[,1])){
+if(!is.null(input$sampling_type) && !is.null(input$Functional_group) && is.null(input$taxons)){
   Sample<- resAll %>% filter(functio_group == input$Functional_group & sampling_type == input$sampling_type)
     traitSplit(Sample)
   points(SampleSLA$log.SLA ~ SampleLNC$log.LNC, type="p", pch=19, col="Red")
     legend("topleft", c("Glopnet",paste(input$Functional_group,input$sampling_type,sep = " & ")) ,col=c("grey","red","blue"), pch=20, bty="n")
 } 
-if((!input$taxon=="" && input$taxon %in% taxonTable[,1]) && is.null(input$sampling_type) && is.null(input$Functional_group)){
-  Sample<- resAll %>% filter(taxon == input$taxon)
+if(!is.null(input$taxons) && is.null(input$sampling_type) && is.null(input$Functional_group)){
+  Sample<- resAll %>% filter(taxon == input$taxons)
     traitSplit(Sample)
   points(SampleSLA$log.SLA ~ SampleLNC$log.LNC, type="p", pch=19, col="Red")
   legend("topleft", c("Glopnet",input$taxon),col=c("grey","red"), pch=20, bty="n")
 }
-if((!input$taxon=="" && input$taxon %in% taxonTable[,1]) && !is.null(input$sampling_type) && is.null(input$Functional_group)){
-  Sample<- resAll %>% filter(taxon == input$taxon & sampling_type == input$sampling_type)
+if(!is.null(input$taxons) && !is.null(input$sampling_type) && is.null(input$Functional_group)){
+  Sample<- resAll %>% filter(taxon == input$taxons & sampling_type == input$sampling_type)
     traitSplit(Sample)
   points(SampleSLA$log.SLA ~ SampleLNC$log.LNC, type="p", pch=19, col="Red")
     legend("topleft", c("Glopnet",paste(input$taxon,input$sampling_type,sep = " & ")),col=c("grey","red","blue"), pch=20, bty="n")
   }
-if((!input$taxon=="" && input$taxon %in% taxonTable[,1]) && is.null(input$sampling_type) && !is.null(input$Functional_group)){
-  Sample<- resAll %>% filter(taxon == input$taxon & functio_group == input$Functional_group)
+if(!is.null(input$taxons) && is.null(input$sampling_type) && !is.null(input$Functional_group)){
+  Sample<- resAll %>% filter(taxon == input$taxons & functio_group == input$Functional_group)
     traitSplit(Sample)
   points(SampleSLA$log.SLA ~ SampleLNC$log.LNC, type="p", pch=19, col="Red")
-    legend("topleft", c("Glopnet",paste(input$taxon,input$Functional_group,ep=" & ^")),col=c("grey","red"), pch=20, bty="n")
-}
-}
-  })
-  
-  observeEvent(input$runGraph,{
-    if(!input$taxon==""){
-        Sample<- resAll %>% filter(taxon == input$taxon)
-#Sample <-filter(Sample,sender_name=="Marney Isaac")#Temporaire
-  SampleSLA<-filter(Sample,trait_name == "SLA")
-  SampleLNC<-filter(Sample,trait_name == "LNC per leaf dry mass")
-    
-  SampleSLA$trait_original_value<-as.double(SampleSLA$trait_original_value)
-  SampleSLA<-normalize(SampleSLA)
-  SampleSLA$log.SLA <- log10(SampleSLA$trait_original_value)
-  SampleLNC$trait_original_value<-as.double(SampleLNC$trait_original_value)
-  SampleLNC$log.LNC <- log10(SampleLNC$trait_original_value)
-  points(SampleSLA$log.SLA ~ SampleLNC$log.LNC, type="p", pch=19, col="Red")  
-
-  legend("topleft", c("Glopnet",input$taxon),
-       col=c("grey","red"), pch=20, bty="n")
-    }
-  })
-
+    legend("topleft", c("Glopnet",paste(input$taxons,input$Functional_group,ep=" & ^")),col=c("grey","red"), pch=20, bty="n")
+}} 
+  }
   
   traitSplit<-function(Sample){
   SampleSLA<<-filter(Sample,trait_name == "SLA")
@@ -208,6 +202,9 @@ if((!input$taxon=="" && input$taxon %in% taxonTable[,1]) && is.null(input$sampli
         inputList[i][[1]]<-taxonHandler(inputList[i][[1]])
       } else { inputList[i][[1]] <- sQuote(inputList[i][[1]],F)}
       filterList<-c(filterList,paste(" info ->>'",inputNameList[i],"' in (",inputList[i],")",sep=""))
+      sql <- paste("info ->>'",inputNameList[i],"' in (?input)",sep="")
+      query<-sqlInterpolate(con,sql,input=inputList[i])
+      filterList<-c(filterList,paste(" info ->>'",inputNameList[i],"' in (",inputList[i],")",sep=""))
     }
   }
     filterList<- paste(filterList, collapse = " and ")
@@ -226,9 +223,9 @@ if((!input$taxon=="" && input$taxon %in% taxonTable[,1]) && is.null(input$sampli
     filterList<-dbManagement()
     AllDataQuery <- paste(readLines("/home/vaillant/Documents/Projets R/Projet CropTrait/CropTraits/Query.txt"), collapse=" ")
     if(!filterList==""){
-          filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"WHERE",filterList," ORDER BY info->>'id_bdd';",sep =" ")
+          filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"WHERE info->>'data_access' in ('Public','Public (notify the PIs)')",filterList," ORDER BY info->>'id_bdd';",sep =" ")
           print(filteredQuery)
-    } else {filteredQuery<-AllDataQuery}
+    } else {filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"WHERE info->>'data_access' in ('Public','Public (notify the PIs)') ORDER BY info->>'id_bdd';",sep =" ")}
     con <- dbConnect(RPostgres::Postgres(), dbname= "CropTrait", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
     incProgress(1/2)
     res <- dbGetQuery(conn = con,statement = filteredQuery)

@@ -30,11 +30,10 @@ dashboardPage(
               #img(src = "crop.png")
               ),
       tabItem(tabName = "visualization",h2("Database visualization"),
-              wellPanel(fluidRow(column(width = 6,textInput("taxon","Taxon"),
+              wellPanel(fluidRow(column(width = 6,selectizeInput("taxons","Taxons",choices = NULL,selected = NULL, multiple = TRUE, options = list(placeholder = 'Select at least one taxon')),
                                         pickerInput("scale",'Scale',multiple=TRUE,choices=NULL,options = list(`actions-box` = TRUE)),
                                         pickerInput("Functional_group",'Functional group',multiple=TRUE,choices=NULL,options = list(`actions-box` = TRUE)),
-                                        pickerInput("sampling_type",'Sampling type',multiple=TRUE,choices=NULL,options = list(`actions-box` = TRUE)),
-                                        actionButton("runGraph","Run")),
+                                        pickerInput("sampling_type",'Sampling type',multiple=TRUE,choices=NULL,options = list(`actions-box` = TRUE))),
                                  column(width = 6,plotOutput("SLAvsLNC"))))),
       tabItem(tabName = "database",h2("CropTrait Database"),
               wellPanel(fluidRow(column(width=6,actionBttn("trait","Trait",style="unite",color="royal")),
