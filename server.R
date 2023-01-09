@@ -13,7 +13,7 @@ function(input,output,session){
   ################-DATABASE MANAGEMENT-##################
   observe({
     tryCatch({
-        AllDataQuery <- paste(readLines("/home/vaillant/Documents/Projets R/Projet CropTrait/CropTraits/Query.txt"), collapse="\n")
+        AllDataQuery <- paste(readLines("Query.txt"), collapse="\n")
   con <- dbConnect(RPostgres::Postgres(), dbname= "CropTrait", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
 
   traitQuery = "select info ->>'id_bdd' as id_bdd,info ->>'crop_name' as crop_name,info ->>'trait_name'as trait_name, info ->>'original_value'as original_value,
@@ -108,7 +108,6 @@ function(input,output,session){
       legend("topleft", "Glopnet",
        col="grey", pch=20, bty="n")
       
-if(!is.null(input$taxons)){
 
 if(length(input$taxons)>1){
   for(i in 1:length(input$taxons)){
@@ -116,7 +115,7 @@ if(length(input$taxons)>1){
   }
 } else {
     plotLoop(input$taxons)
-  }}})
+  }})
     
   plotLoop <- function(taxonList){
        if(!(is.null(input$sampling_type) && is.null(input$Functional_group) && is.null(input$taxons))){
@@ -124,7 +123,6 @@ if(length(input$taxons)>1){
 if(is.null(input$sampling_type) && !is.null(input$Functional_group) && is.null(input$taxons)){
   Sample<- resAll %>% filter(functio_group == input$Functional_group)
     traitSplit(Sample)
-  points(SampleSLA$log.SLA ~ SampleLNC$log.LNC, type="p", pch=19, col="Red")
     legend("topleft", c("Glopnet",input$Functional_group),col=c("grey","red"), pch=20, bty="n")
 }
 if(!is.null(input$sampling_type) && is.null(input$Functional_group) && is.null(input$taxons)){
@@ -221,7 +219,7 @@ if(!is.null(input$taxons) && is.null(input$sampling_type) && !is.null(input$Func
     withProgress(message="Browsing database",detail = "Please wait", value = 0,{
       incProgress(1/5)
     filterList<-dbManagement()
-    AllDataQuery <- paste(readLines("/home/vaillant/Documents/Projets R/Projet CropTrait/CropTraits/Query.txt"), collapse=" ")
+    AllDataQuery <- paste(readLines("Query.txt"), collapse=" ")
     if(!filterList==""){
           filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"WHERE info->>'data_access' in ('Public','Public (notify the PIs)')",filterList," ORDER BY info->>'id_bdd';",sep =" ")
           print(filteredQuery)
@@ -254,5 +252,10 @@ if(!is.null(input$taxons) && is.null(input$sampling_type) && !is.null(input$Func
       }
     )
   }
-  
+      output$fieldDesc <- downloadHandler(
+      filename = "fieldsDescription.xlsx",
+      content = function(file) {
+        file.copy("fieldsDescription.xlsx",file)
+      }
+    )
   }
