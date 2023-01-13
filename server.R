@@ -101,27 +101,32 @@ function(input,output,session){
     taxonTable <-read.table("taxon_Table.csv",header = T,sep=";", dec=".",quote='"', fill=FALSE)
 
   ############-SLA vs LNC Plot-##################
+    isTimeToReset<-TRUE
+    
   output$SLAvsLNC<-renderPlot({
-    plot(GLOPNET$log.LMA ~ GLOPNET$log.Nmass, type="n",xlim=c(-0.8,1), ylim=c(0,2.7), 
-     xlab=expression(bold("Leaf nitrogen content (LNC; log10; %)")),ylab=expression(bold("Specific leaf area (SLA; log10; m?/kg)")))
+    #if(isTRUE(isTimeToReset)){
+      plot(GLOPNET$log.LMA ~ GLOPNET$log.Nmass, type="n",xlim=c(-0.8,1), ylim=c(0,2.7), 
+      xlab=expression(bold("Leaf nitrogen content (LNC; log10; %)")),ylab=expression(bold("Specific leaf area (SLA; log10; m?/kg)")))
+      isTimeToReset<<-FALSE
+    #}
+
     if(isTRUE(input$glopnetData)){
           points(GLOPNET$log.SLA ~ GLOPNET$log.Nmass, type="p", pch=20, col="grey")
       legend("topleft", "Glopnet",col="grey", pch=20, bty="n")
     }
-    
-  if(length(input$taxons)>1){
+                if(length(input$taxons)>1){
   for(i in 1:length(input$taxons)){
     plotLoop(input$taxons[i])
   }
   } else {
     plotLoop(input$taxons)
   }
-   })
+    })
     
   plotLoop <- function(taxonList){
-       if(!(is.null(input$sampling_type) && is.null(input$Functional_group) && is.null(input$taxons))){
+       if(!(is.null(input$sampling_type) && is.null(input$Functional_group) && is.null(taxonList))){
   
-if(is.null(input$sampling_type) && !is.null(input$Functional_group) && is.null(input$taxons)){
+if(is.null(input$sampling_type) && !is.null(input$Functional_group) && is.null(taxonList)){
   Sample<- resAll %>% filter(functio_group == input$Functional_group)
   genList<-traitSplit(Sample)
       if(length(genList[[1]])==0){
@@ -130,7 +135,7 @@ if(is.null(input$sampling_type) && !is.null(input$Functional_group) && is.null(i
                      "Please retry with other criteria", sep="\n ")
         })
     } else {
-  points(genList$meanSLA ~ genList$meanLNC, type="p", pch=19, col="Red") 
+        points(genList$meanSLA ~ genList$meanLNC, type="p", pch=19, col="Red")
           output$resText<-renderText({
           paste("Your filters match ",length(genList[[1]]) ," unique genotypes in the database.", sep="")
         })
@@ -140,7 +145,7 @@ if(is.null(input$sampling_type) && !is.null(input$Functional_group) && is.null(i
             legend("topleft", c(input$Functional_group),col=c("red"), pch=20, bty="n")
       }}
 }
-if(!is.null(input$sampling_type) && is.null(input$Functional_group) && is.null(input$taxons)){
+if(!is.null(input$sampling_type) && is.null(input$Functional_group) && is.null(taxonList)){
   Sample<- resAll %>% filter(sampling_type == input$sampling_type)
     genList<-traitSplit(Sample)
         if(length(genList[[1]])==0){
@@ -159,7 +164,7 @@ if(!is.null(input$sampling_type) && is.null(input$Functional_group) && is.null(i
             legend("topleft", c(input$sampling_type),col=c("red"), pch=20, bty="n")
       }}
     }                     
-if(!is.null(input$sampling_type) && !is.null(input$Functional_group) && is.null(input$taxons)){
+if(!is.null(input$sampling_type) && !is.null(input$Functional_group) && is.null(taxonList)){
   Sample<- resAll %>% filter(functio_group == input$Functional_group & sampling_type == input$sampling_type)
     genList<-traitSplit(Sample)
         if(length(genList[[1]])==0){
@@ -178,8 +183,9 @@ if(!is.null(input$sampling_type) && !is.null(input$Functional_group) && is.null(
             legend("topleft", c(paste(input$Functional_group,input$sampling_type,sep = " & ")),col=c("red","blue"), pch=20, bty="n")
       }}
 } 
-if(!is.null(input$taxons) && is.null(input$sampling_type) && is.null(input$Functional_group)){
-  Sample<- resAll %>% filter(taxon == input$taxons)
+if(!is.null(taxonList) && is.null(input$sampling_type) && is.null(input$Functional_group)){
+  Sample<- resAll %>% filter(taxon == taxonList)
+  #assign(paste("genSample",sample(1:1000,1),sep=""),traitSplit(Sample))
     genList<-traitSplit(Sample)
         if(length(genList[[1]])==0){
           output$resText<-renderText({
@@ -192,13 +198,13 @@ if(!is.null(input$taxons) && is.null(input$sampling_type) && is.null(input$Funct
           paste("Your filters match ",length(genList[[1]]) ," unique genotypes in the database.", sep="")
         })
         if(isTRUE(input$glopnetData)){
-            legend("topleft", c("Glopnet",input$taxons),col=c("grey","red"), pch=20, bty="n")      
+            legend("topleft", c("Glopnet",taxonList),col=c("grey","red"), pch=20, bty="n")      
           } else {
-            legend("topleft", c(input$taxons),col=c("red"), pch=20, bty="n")
+            legend("topleft", c(taxonList),col=c("red"), pch=20, bty="n")
       }}
 }
-if(!is.null(input$taxons) && !is.null(input$sampling_type) && is.null(input$Functional_group)){
-  Sample<- resAll %>% filter(taxon == input$taxons & sampling_type == input$sampling_type)
+if(!is.null(taxonList) && !is.null(input$sampling_type) && is.null(input$Functional_group)){
+  Sample<- resAll %>% filter(taxon == taxonList & sampling_type == input$sampling_type)
     genList<-traitSplit(Sample)
         if(length(genList[[1]])==0){
           output$resText<-renderText({
@@ -211,14 +217,14 @@ if(!is.null(input$taxons) && !is.null(input$sampling_type) && is.null(input$Func
           paste("Your filters match ",length(genList[[1]]) ," unique genotypes in the database.", sep="")
         })
             if(isTRUE(input$glopnetData)){
-                legend("topleft", c("Glopnet",paste(input$taxons,input$sampling_type,sep = " & ")),col=c("grey","red","blue"), pch=20, bty="n")
+                legend("topleft", c("Glopnet",paste(taxonList,input$sampling_type,sep = " & ")),col=c("grey","red","blue"), pch=20, bty="n")
               } else {
-            legend("topleft", c(paste(input$taxons,input$sampling_type,sep = " & ")),col=c("red","blue"), pch=20, bty="n")
+            legend("topleft", c(paste(taxonList,input$sampling_type,sep = " & ")),col=c("red","blue"), pch=20, bty="n")
               }
     }
   }
-if(!is.null(input$taxons) && is.null(input$sampling_type) && !is.null(input$Functional_group)){
-  Sample<- resAll %>% filter(taxon == input$taxons & functio_group == input$Functional_group)
+if(!is.null(taxonList) && is.null(input$sampling_type) && !is.null(input$Functional_group)){
+  Sample<- resAll %>% filter(taxon == taxonList & functio_group == input$Functional_group)
     genList<-traitSplit(Sample)
     if(length(genList[[1]])==0){
           output$resText<-renderText({
@@ -231,9 +237,9 @@ if(!is.null(input$taxons) && is.null(input$sampling_type) && !is.null(input$Func
           paste("Your filters match ",length(genList[[1]]) ," unique genotypes in the database.", sep="")
         })
                 if(isTRUE(input$glopnetData)){
-                    legend("topleft", c("Glopnet",paste(input$taxons,input$Functional_group,sep=" & ")),col=c("grey","red"), pch=20, bty="n")
+                    legend("topleft", c("Glopnet",paste(taxonList,input$Functional_group,sep=" & ")),col=c("grey","red"), pch=20, bty="n")
               } else {
-                    legend("topleft", c(paste(input$taxons,input$Functional_group,sep=" & ")),col=c("red"), pch=20, bty="n")
+                    legend("topleft", c(paste(taxonList,input$Functional_group,sep=" & ")),col=c("red"), pch=20, bty="n")
       } 
     }
 }} 
@@ -287,10 +293,13 @@ if(!is.null(input$taxons) && is.null(input$sampling_type) && !is.null(input$Func
   return(dataset)
   }
   
+  observeEvent(input$reset,{
+    isTimeToReset<-TRUE
+  })
   ########################################################################
   #############################-Download Data-############################
   ########################################################################
-  dbManagement<- function(){
+  dbManagement<- function(con){
   filterList<-""
   inputList<-list(input$dlTaxon,input$scale,input$dlTraits,input$dlFunctional_group,input$dlSampling_type)
   inputNameList<-list("taxon","traitmeas_scale","trait_name","functio_group","sampling_type")
@@ -304,9 +313,9 @@ if(!is.null(input$taxons) && is.null(input$sampling_type) && !is.null(input$Func
         inputList[i][[1]]<-taxonHandler(inputList[i][[1]])
       } else { inputList[i][[1]] <- sQuote(inputList[i][[1]],F)}
       filterList<-c(filterList,paste(" info ->>'",inputNameList[i],"' in (",inputList[i],")",sep=""))
-      sql <- paste("info ->>'",inputNameList[i],"' in (?input)",sep="")
-      query<-sqlInterpolate(con,sql,input=inputList[i])
-      filterList<-c(filterList,paste(" info ->>'",inputNameList[i],"' in (",inputList[i],")",sep=""))
+      #sql <- paste("info ->>'",inputNameList[i],"' in (?input)",sep="")
+      #query<-sqlInterpolate(con,sql,input=inputList[i][[1]])
+      #filterList<-c(filterList,paste(" info ->>'",inputNameList[i],"' in (",inputList[i],")",sep=""))
     }
   }
     filterList<- paste(filterList, collapse = " and ")
@@ -322,20 +331,27 @@ if(!is.null(input$taxons) && is.null(input$sampling_type) && !is.null(input$Func
     shinyjs::hide("queryDl")
     withProgress(message="Browsing database",detail = "Please wait", value = 0,{
       incProgress(1/5)
-    filterList<-dbManagement()
+    con <- dbConnect(RPostgres::Postgres(), dbname= "CropTrait", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
+    filterList<-dbManagement(con)
     AllDataQuery <- paste(readLines("Query.txt"), collapse=" ")
     if(!filterList==""){
-          filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"WHERE info->>'data_access' in ('Public','Public (notify the PIs)')",filterList," ORDER BY info->>'id_bdd';",sep =" ")
+          filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"WHERE info->>'data_access' in ('Public','Public (notify the PIs)') and",filterList," ORDER BY info->>'id_bdd';",sep =" ")
           print(filteredQuery)
     } else {filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"WHERE info->>'data_access' in ('Public','Public (notify the PIs)') ORDER BY info->>'id_bdd';",sep =" ")}
-    con <- dbConnect(RPostgres::Postgres(), dbname= "CropTrait", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
     incProgress(1/2)
-    res <- dbGetQuery(conn = con,statement = filteredQuery)
+    res <<- dbGetQuery(conn = con,statement = filteredQuery)
     dbDisconnect(con)
+    
+    #checkDataAccess(res)
+    userData<<- res %>% filter(data_access == "Public (notify the PIs)")
+    if(length(userData[,1])>0){
+      shinyjs::show("userInfos")
+    } else {
     write.table(res,"queryRes.csv",sep = ";",row.names = FALSE)
     uploadData()
-    })
     shinyjs::show("queryDl")
+    }
+    })
   })
   
   taxonHandler<-function(taxonInput){
@@ -343,6 +359,30 @@ if(!is.null(input$taxons) && is.null(input$sampling_type) && !is.null(input$Func
     splited<- strsplit(nospace,",")
     editedTaxonInput<-sapply(splited, function(x) toString(sQuote(x,FALSE)))
     return(editedTaxonInput)
+  }
+  
+  #####################################################
+  ###############-Check data access-###################
+  isInfosFilled<-observeEvent(input$submit,{
+    if(!input$userMail=="" && isValidEmail(input$userMail)){
+      PiToContact<-userData %>% distinct(userData$pi_contact)
+    for(i in 1:length(PiToContact[,1])){
+      nospace<- str_replace_all(PiToContact[i,1]," ","")
+      splited<- strsplit(nospace,",")
+      for(j in 1:length(splited[[1]])){
+        system(paste("Rscript --vanilla mailSender.R",input$userMail,splited[[1]][j],input$projectSummary),wait = FALSE)
+      }
+    }
+    write.table(res,"queryRes.csv",sep = ";",row.names = FALSE)
+    uploadData()
+    shinyjs::show("queryDl")
+    shinyjs::hide("userInfos")
+    }
+  })
+
+  ###-EMAIL PATTERN TO MATCH-###
+  isValidEmail <- function(x) {
+    grepl("\\<[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\>", as.character(x), ignore.case=TRUE)
   }
   #####################################################
   ############### DOWNLOAD HANDLING ###################
