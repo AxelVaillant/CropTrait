@@ -100,162 +100,135 @@ function(input,output,session){
     
     taxonTable <-read.table("taxon_Table.csv",header = T,sep=";", dec=".",quote='"', fill=FALSE)
 
-  ############-SLA vs LNC Plot-##################
-    isTimeToReset<-TRUE
+    ###-Reactive data for plotting-###
+    myReact <- reactiveValues()
+    buttonClicked<- reactive(input$visualize)
     
-  output$SLAvsLNC<-renderPlot({
-    #if(isTRUE(isTimeToReset)){
-      plot(GLOPNET$log.LMA ~ GLOPNET$log.Nmass, type="n",xlim=c(-0.8,1), ylim=c(0,2.7), 
-      xlab=expression(bold("Leaf nitrogen content (LNC; log10; %)")),ylab=expression(bold("Specific leaf area (SLA; log10; m?/kg)")))
-      isTimeToReset<<-FALSE
-    #}
-
-    if(isTRUE(input$glopnetData)){
-          points(GLOPNET$log.SLA ~ GLOPNET$log.Nmass, type="p", pch=20, col="grey")
-      legend("topleft", "Glopnet",col="grey", pch=20, bty="n")
-    }
-                if(length(input$taxons)>1){
-  for(i in 1:length(input$taxons)){
-    plotLoop(input$taxons[i])
-  }
-  } else {
-    plotLoop(input$taxons)
-  }
+    ###-Add one condition to plot-###
+    observeEvent(input$visualize,{
+      Sample<-concatenateQuery()
+      if(!is.null(Sample)){
+        genList<-traitSplit(Sample)
+        displayVisuResult(genList)
+        myReact$toPlot<-rbind(myReact$toPlot,genList)
+        }
+    })
+    ###-Enable/Disable glopnet data-###
+    observeEvent(input$glopnetData,{
+      if(isTRUE(input$glopnetData)){
+        glopnetDf<-buildGlopnet()
+        myReact$toPlot<-rbind(myReact$toPlot,glopnetDf)
+      } else {
+        myReact$toPlot <- myReact$toPlot %>% filter(filterName != "Glopnet")
+      }
     })
     
-  plotLoop <- function(taxonList){
-       if(!(is.null(input$sampling_type) && is.null(input$Functional_group) && is.null(taxonList))){
-  
-if(is.null(input$sampling_type) && !is.null(input$Functional_group) && is.null(taxonList)){
-  Sample<- resAll %>% filter(functio_group == input$Functional_group)
-  genList<-traitSplit(Sample)
-      if(length(genList[[1]])==0){
-          output$resText<-renderText({
-          paste("Your filters doesn't match any SLA/LNC couple in the database.",
-                     "Please retry with other criteria", sep="\n ")
-        })
+  ############-SLA vs LNC Plot-##################
+  output$SLAvsLNC<-renderPlot({
+    if(!is.null(myReact$toPlot)){
+      filters<-myReact$toPlot %>% distinct(filterName)
+      myReact$toPlot$filterName <- factor(myReact$toPlot$filterName, levels = filters[,1] )
+      ggplot(myReact$toPlot ,aes(x = meanLNC, y = meanSLA, color = filterName)) + geom_point() + xlim(-0.8,1) + ylim(0,2.7) +
+        labs(x = "Leaf nitrogen content (LNC; log10; %)" , y= "Specific leaf area (SLA; log10; m2/kg)", colour = "Conditions") +
+        theme(
+          axis.title = element_text(size=14, face="bold", colour = "black"),
+          axis.text = element_text(size=12, face="bold", colour = "black"),
+          legend.title = element_text(size=12, face="bold", colour = "#757574"))
     } else {
-        points(genList$meanSLA ~ genList$meanLNC, type="p", pch=19, col="Red")
-          output$resText<-renderText({
-          paste("Your filters match ",length(genList[[1]]) ," unique genotypes in the database.", sep="")
-        })
-      if(isTRUE(input$glopnetData)){
-            legend("topleft", c("Glopnet",input$Functional_group),col=c("grey","red"), pch=20, bty="n")
-      } else {
-            legend("topleft", c(input$Functional_group),col=c("red"), pch=20, bty="n")
-      }}
-}
-if(!is.null(input$sampling_type) && is.null(input$Functional_group) && is.null(taxonList)){
-  Sample<- resAll %>% filter(sampling_type == input$sampling_type)
-    genList<-traitSplit(Sample)
-        if(length(genList[[1]])==0){
-          output$resText<-renderText({
-          paste("Your filters doesn't match any SLA/LNC couple in the database.",
-                     "Please retry with other criteria", sep="\n ")
-        })
-    } else {
-  points(genList$meanSLA ~ genList$meanLNC, type="p", pch=19, col="Red")
-                output$resText<-renderText({
-          paste("Your filters match ",length(genList[[1]]) ," unique genotypes in the database.", sep="")
-        })
-        if(isTRUE(input$glopnetData)){
-            legend("topleft", c("Glopnet",input$sampling_type),col=c("grey","red"), pch=20, bty="n")
-      } else {
-            legend("topleft", c(input$sampling_type),col=c("red"), pch=20, bty="n")
-      }}
-    }                     
-if(!is.null(input$sampling_type) && !is.null(input$Functional_group) && is.null(taxonList)){
-  Sample<- resAll %>% filter(functio_group == input$Functional_group & sampling_type == input$sampling_type)
-    genList<-traitSplit(Sample)
-        if(length(genList[[1]])==0){
-          output$resText<-renderText({
-          paste("Your filters doesn't match any SLA/LNC couple in the database.",
-                     "Please retry with other criteria", sep="\n ")
-        })
-    } else {
-  points(genList$meanSLA ~ genList$meanLNC, type="p", pch=19, col="Red")
-                output$resText<-renderText({
-          paste("Your filters match ",length(genList[[1]]) ," unique genotypes in the database.", sep="")
-        })
-      if(isTRUE(input$glopnetData)){
-            legend("topleft", c("Glopnet",paste(input$Functional_group,input$sampling_type,sep = " & ")) ,col=c("grey","red","blue"), pch=20, bty="n")
-      } else {
-            legend("topleft", c(paste(input$Functional_group,input$sampling_type,sep = " & ")),col=c("red","blue"), pch=20, bty="n")
-      }}
-} 
-if(!is.null(taxonList) && is.null(input$sampling_type) && is.null(input$Functional_group)){
-  Sample<- resAll %>% filter(taxon == taxonList)
-  #assign(paste("genSample",sample(1:1000,1),sep=""),traitSplit(Sample))
-    genList<-traitSplit(Sample)
-        if(length(genList[[1]])==0){
-          output$resText<-renderText({
-          paste("Your filters doesn't match any SLA/LNC couple in the database.",
-                     "Please retry with other criteria", sep="\n ")
-        })
-    } else {
-  points(genList$meanSLA ~ genList$meanLNC, type="p", pch=19, col="Red")
-                output$resText<-renderText({
-          paste("Your filters match ",length(genList[[1]]) ," unique genotypes in the database.", sep="")
-        })
-        if(isTRUE(input$glopnetData)){
-            legend("topleft", c("Glopnet",taxonList),col=c("grey","red"), pch=20, bty="n")      
-          } else {
-            legend("topleft", c(taxonList),col=c("red"), pch=20, bty="n")
-      }}
-}
-if(!is.null(taxonList) && !is.null(input$sampling_type) && is.null(input$Functional_group)){
-  Sample<- resAll %>% filter(taxon == taxonList & sampling_type == input$sampling_type)
-    genList<-traitSplit(Sample)
-        if(length(genList[[1]])==0){
-          output$resText<-renderText({
-          paste("Your filters doesn't match any SLA/LNC couple in the database.",
-                     "Please retry with other criteria", sep="\n ")
-        })
-    } else {
-  points(genList$meanSLA ~ genList$meanLNC, type="p", pch=19, col="Red")
-                output$resText<-renderText({
-          paste("Your filters match ",length(genList[[1]]) ," unique genotypes in the database.", sep="")
-        })
-            if(isTRUE(input$glopnetData)){
-                legend("topleft", c("Glopnet",paste(taxonList,input$sampling_type,sep = " & ")),col=c("grey","red","blue"), pch=20, bty="n")
-              } else {
-            legend("topleft", c(paste(taxonList,input$sampling_type,sep = " & ")),col=c("red","blue"), pch=20, bty="n")
-              }
+      df <- data.frame(x=rnorm(20),y=rnorm(20,1,0.5))
+      ggplot(df,aes(x,y)) +geom_blank() + xlim(-0.8,1) + ylim(0,2.7) + labs(x = "Leaf nitrogen content (LNC; log10; %)" , y= "Specific leaf area (SLA; log10; m2/kg)", colour = "Conditions") +
+        theme(
+          axis.title = element_text(size=14, face="bold", colour = "black"),
+          axis.text = element_text(size=12, face="bold", colour = "black"),
+          legend.title = element_text(size=12, face="bold", colour = "#757574"))
     }
+  })
+  
+  ############################
+  #####-Build glopnet df -####
+  ############################
+  buildGlopnet<-function(){
+    glopnetDf<-data.frame(matrix(ncol=3,nrow=0))
+    colnames(glopnetDf) <-c('meanSLA','meanLNC','filterName')
+    glopnetDf$filterName<-as.character(glopnetDf$filterName)
+    for(i in 1:length(GLOPNET[,1])){
+      glopnetDf<-glopnetDf %>% add_row(meanSLA = GLOPNET[i,]$log.SLA, meanLNC = GLOPNET[i,]$log.Nmass, filterName = "Glopnet")
+    }
+    return(glopnetDf)
   }
-if(!is.null(taxonList) && is.null(input$sampling_type) && !is.null(input$Functional_group)){
-  Sample<- resAll %>% filter(taxon == taxonList & functio_group == input$Functional_group)
+  
+  #############################################################
+  ######-Concatenate filters and get corresponding data-#######
+  #############################################################
+  concatenateQuery<-function(){
+  visuInputList<-list(input$taxons,input$Functional_group,input$sampling_type)
+  visuInputNames<-c("taxon","functio_group","sampling_type")
+  ####-REMPLACER FOR LOOP PAR APPLY
+  visuQuery<-NULL
+  for(i in 1:length(visuInputList)){
+    if(!is.null(visuInputList[i][[1]])){
+      query <- paste(noquote(visuInputNames[i])," == ",sQuote(visuInputList[i],F),sep=" ")
+      if(is.null(visuQuery)){
+        visuQuery<-query
+      } else {
+        visuQuery<-paste(visuQuery,query,sep = " & ")
+      }
+          }
+  }
+  if(!is.null(visuQuery)){
+      Sample<- resAll %>% filter(!! rlang::parse_expr(visuQuery))
+      return(Sample)
+  } else { return(NULL)}
+    }
+  ##########################################################
+  ##########-Print data and corresponding legend-###########
+  ##########################################################
+  pointsLoop <- function(Sample){
     genList<-traitSplit(Sample)
+    filterUsed<-c(input$taxons,input$Functional_group,input$sampling_type)
+    legendText<-NULL
+    for(i in 1:length(filterUsed)){
+            if(is.null(legendText)){
+        legendText<-filterUsed[i]
+      } else {
+        legendText<-paste(legendText,filterUsed[i],sep = " & ")
+      }
+    }
+        if(length(genList[[1]])==0){
+          output$resText<-renderText({
+          paste("Your filters doesn't match any SLA/LNC couple in the database.",
+                     "Please retry with other criteria", sep="\n ")
+        })
+    } else {
+  points(genList$meanSLA ~ genList$meanLNC, type="p", pch=19, col="Red")
+                output$resText<-renderText({
+          paste("Your filters match ",length(genList[[1]]) ," unique genotypes in the database.", sep="")
+        })
+        if(isTRUE(input$glopnetData)){
+            legend("topleft", c("Glopnet",legendText),col=c("grey","red"), pch=20, bty="n")      
+          } else {
+            legend("topleft", c(legendText),col=c("red"), pch=20, bty="n")
+      }}
+  }
+    
+  displayVisuResult<-function(genList){
     if(length(genList[[1]])==0){
           output$resText<-renderText({
           paste("Your filters doesn't match any SLA/LNC couple in the database.",
                      "Please retry with other criteria", sep="\n ")
         })
     } else {
-       points(genList$meanSLA ~ genList$meanLNC, type="p", pch=19, col="Red")
-                output$resText<-renderText({
-          paste("Your filters match ",length(genList[[1]]) ," unique genotypes in the database.", sep="")
+        output$resText<-renderText({
+        paste("Your filters match ",length(genList[[1]]) ," unique genotypes in the database.", sep="")
         })
-                if(isTRUE(input$glopnetData)){
-                    legend("topleft", c("Glopnet",paste(taxonList,input$Functional_group,sep=" & ")),col=c("grey","red"), pch=20, bty="n")
-              } else {
-                    legend("topleft", c(paste(taxonList,input$Functional_group,sep=" & ")),col=c("red"), pch=20, bty="n")
-      } 
-    }
-}} 
-  }
-  
-  
+    }}
   
   traitSplit<-function(Sample){
-#  Sample2 <- Sample[,c(2,104,106)]  
-#  SampleTest <- spread(Sample2, 
-#                   key = "trait_name",
-#                   value = "original_value"
-#)  
+  filterLegend<-legendHandler()  
   genotypes<-(Sample %>% distinct(gen_name))
-  genList<-data.frame(matrix(ncol=2,nrow=0))
-  colnames(genList) <-c('meanSLA','meanLNC')
+  genList<-data.frame(matrix(ncol=3,nrow=0))
+  colnames(genList) <-c('meanSLA','meanLNC','filterName')
+  genList$filterName<-as.character(genList$filterName)
   for (i in 1:length(genotypes[[1]])){
     genSample <- filter (Sample,gen_name==genotypes[[1]][i])
     genSample$trait_original_value <- as.double(genSample$trait_original_value)
@@ -264,18 +237,13 @@ if(!is.null(taxonList) && is.null(input$sampling_type) && !is.null(input$Functio
     genSampleLNC<-filter(genSample,trait_name == "LNC per leaf dry mass")
     if(length(genSampleSLA[[1]])>0 && length(genSampleLNC[[1]]>0)){
       genSampleSLA<-normalize(genSampleSLA)
-      genList<-genList %>% add_row(meanSLA = mean(genSampleSLA$trait_original_value), meanLNC = mean(genSampleLNC$trait_original_value))
+      genList<-genList %>% add_row(meanSLA = mean(genSampleSLA$trait_original_value), meanLNC = mean(genSampleLNC$trait_original_value), filterName = filterLegend)
     }
   }
-  return(log10(genList))
- #SampleSLA<<-filter(Sample,trait_name == "SLA")
- #SampleLNC<<-filter(Sample,trait_name == "LNC per leaf dry mass")
- #  
- #SampleSLA$trait_original_value<<-as.double(SampleSLA$trait_original_value)
- #SampleSLA<<-normalize(SampleSLA)
- #SampleSLA$log.SLA <<- log10(SampleSLA$trait_original_value)
- #SampleLNC$trait_original_value<-as.double(SampleLNC$trait_original_value)
- #SampleLNC$log.LNC <<- log10(SampleLNC$trait_original_value)
+  genList$meanSLA<-log10(genList$meanSLA)
+  genList$meanLNC<-log10(genList$meanLNC)
+  ##
+  return(genList)
   }
   
   normalize<-function(dataset){
@@ -286,15 +254,29 @@ if(!is.null(taxonList) && is.null(input$sampling_type) && !is.null(input$Functio
     if(dataset[i,]$trait_original_unit == "cm2/mg"){
       dataset[i,]$trait_original_value <- dataset[i,]$trait_original_value*100
     }
-    #if(dataset[i,]$trait_original_unit == "mm2/mg"){
-     # dataset[i,]$trait_original_value <- dataset[i,]$trait_original_value/1000
-    #}
   }
   return(dataset)
   }
   
+  legendHandler<-function(){
+        filterUsed<-c(input$taxons,input$Functional_group,input$sampling_type)
+        legendText<-NULL
+        for(i in 1:length(filterUsed)){
+                if(is.null(legendText)){
+            legendText<-filterUsed[i]
+          } else {
+            legendText<-paste(legendText,filterUsed[i],sep = " & ")
+          }
+        }
+        return(legendText)
+  }
+  ###-Reset Plot-###
   observeEvent(input$reset,{
-    isTimeToReset<-TRUE
+    if(isTRUE(input$glopnetData)){
+      myReact$toPlot <- myReact$toPlot %>% filter(filterName == "Glopnet")  
+    } else {
+      myReact$toPlot<-NULL  
+    }
   })
   ########################################################################
   #############################-Download Data-############################
@@ -342,7 +324,6 @@ if(!is.null(taxonList) && is.null(input$sampling_type) && !is.null(input$Functio
     res <<- dbGetQuery(conn = con,statement = filteredQuery)
     dbDisconnect(con)
     
-    #checkDataAccess(res)
     userData<<- res %>% filter(data_access == "Public (notify the PIs)")
     if(length(userData[,1])>0){
       shinyjs::show("userInfos")
