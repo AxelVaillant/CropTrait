@@ -108,9 +108,11 @@ function(input,output,session){
     observeEvent(input$visualize,{
       Sample<-concatenateQuery()
       if(!is.null(Sample)){
+        shinyjs::hide('resText')
         genList<-traitSplit(Sample)
         displayVisuResult(genList)
         myReact$toPlot<-rbind(myReact$toPlot,genList)
+        shinyjs::show('resText')
         }
     })
     ###-Enable/Disable glopnet data-###
@@ -181,36 +183,8 @@ function(input,output,session){
   } else { return(NULL)}
     }
   ##########################################################
-  ##########-Print data and corresponding legend-###########
+  ##########-Print database matching results-###########
   ##########################################################
-  pointsLoop <- function(Sample){
-    genList<-traitSplit(Sample)
-    filterUsed<-c(input$taxons,input$Functional_group,input$sampling_type)
-    legendText<-NULL
-    for(i in 1:length(filterUsed)){
-            if(is.null(legendText)){
-        legendText<-filterUsed[i]
-      } else {
-        legendText<-paste(legendText,filterUsed[i],sep = " & ")
-      }
-    }
-        if(length(genList[[1]])==0){
-          output$resText<-renderText({
-          paste("Your filters doesn't match any SLA/LNC couple in the database.",
-                     "Please retry with other criteria", sep="\n ")
-        })
-    } else {
-  points(genList$meanSLA ~ genList$meanLNC, type="p", pch=19, col="Red")
-                output$resText<-renderText({
-          paste("Your filters match ",length(genList[[1]]) ," unique genotypes in the database.", sep="")
-        })
-        if(isTRUE(input$glopnetData)){
-            legend("topleft", c("Glopnet",legendText),col=c("grey","red"), pch=20, bty="n")      
-          } else {
-            legend("topleft", c(legendText),col=c("red"), pch=20, bty="n")
-      }}
-  }
-    
   displayVisuResult<-function(genList){
     if(length(genList[[1]])==0){
           output$resText<-renderText({
@@ -272,6 +246,7 @@ function(input,output,session){
   }
   ###-Reset Plot-###
   observeEvent(input$reset,{
+    shinyjs::hide("resText")
     if(isTRUE(input$glopnetData)){
       myReact$toPlot <- myReact$toPlot %>% filter(filterName == "Glopnet")  
     } else {

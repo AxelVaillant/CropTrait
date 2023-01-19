@@ -35,7 +35,7 @@ dashboardPage(
                                         pickerInput("scale",'Scale',multiple=TRUE,choices=NULL,options = list(`actions-box` = TRUE)),
                                         pickerInput("Functional_group",'Functional group',multiple=TRUE,choices=NULL,options = list(`actions-box` = TRUE)),
                                         pickerInput("sampling_type",'Sampling type',multiple=TRUE,choices=NULL,options = list(`actions-box` = TRUE)),
-                                        actionButton("visualize","Visualize"),actionButton("reset","Reset"),p(),span(verbatimTextOutput('resText'),style="color:red;text-align:center;")),
+                                        actionButton("visualize","Visualize"),actionButton("reset","Reset"),p(),span(verbatimTextOutput('resText'),style="text-align:center;")),
                                  column(width = 6,plotOutput("SLAvsLNC"))))),
       tabItem(tabName = "database",h2("CropTrait Database"),
               wellPanel(fluidRow(column(width=6,actionBttn("trait","Trait",style="unite",color="royal")),
