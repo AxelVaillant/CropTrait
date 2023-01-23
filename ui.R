@@ -31,7 +31,7 @@ dashboardPage(
               ),
       tabItem(tabName = "visualization",h2("Database visualization"),
               wellPanel(fluidRow(column(width = 6,checkboxInput("glopnetData","Glopnet Data",value = TRUE),
-                                        selectizeInput("taxons","Taxons",choices = NULL,selected = NULL, multiple = TRUE, options = list(placeholder = 'Select at least one taxon')),
+                                        selectizeInput("taxons","Taxons",choices = NULL,selected = NULL, multiple = TRUE, options = list(placeholder = 'Leave this field empty to match all taxons',maxOptions = 2500)),
                                         pickerInput("scale",'Scale',multiple=TRUE,choices=NULL,options = list(`actions-box` = TRUE)),
                                         pickerInput("Functional_group",'Functional group',multiple=TRUE,choices=NULL,options = list(`actions-box` = TRUE)),
                                         pickerInput("sampling_type",'Sampling type',multiple=TRUE,choices=NULL,options = list(`actions-box` = TRUE)),

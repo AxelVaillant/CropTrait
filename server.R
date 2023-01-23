@@ -8,7 +8,12 @@ function(input,output,session){
   dbPassword<-credentials$dbPassword
   
   ###
-  DB <-read.table("DB.csv",header = T,sep=";", dec=".", fill=T)
+  resAll <-read.table("DB.csv",header = T,sep=";", dec=".", fill=T)
+  taxonTable <-read.table("taxon_Table.csv",header = T,sep=";", dec=".",quote='"', fill=FALSE)
+  #traits <- read.table("trait_table.csv",header = T,sep=";", dec=".",quote='"', fill=FALSE)
+  #functio_group <- read.table("functio_group_table.csv",header = T,sep=";", dec=".",quote='"', fill=FALSE)
+  #sampling_type <- read.table("sampling_type_table.csv",header = T,sep=";", dec=".",quote='"', fill=FALSE)
+
   #######################################################
   ################-DATABASE MANAGEMENT-##################
   observe({
@@ -16,18 +21,9 @@ function(input,output,session){
         AllDataQuery <- paste(readLines("Query.txt"), collapse="\n")
   con <- dbConnect(RPostgres::Postgres(), dbname= "CropTrait", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
 
-  traitQuery = "select info ->>'id_bdd' as id_bdd,info ->>'crop_name' as crop_name,info ->>'trait_name'as trait_name, info ->>'original_value'as original_value,
-  info ->>'original_unit'as original_unit,info ->>'stage' as stage,info ->>'organ'as organ,
-  info ->>'method'as method from croptrait;"
-  
-  taxonQuery ="select info ->>'id_bdd'as id_bdd, info ->>'taxon'as taxon, info ->>'taxon_accepted'as taxon_accepted,
-  info ->>'family'as family,info ->>'genus' as genus,info ->>'species'as species,  info ->>'spauthor'as spauthor,
-  info ->>'subtaxa'as subtaxa,  info ->>'subtauthor'as subtauthor,  info ->>'variety'as variety,
-  info ->>'crop_name'as crop_name,  info ->>'gen_name'as gen_name,info ->>'select_type'as select_type from croptrait LIMIT 1000;"
-  
   ###-Selectize input-###
-  updateSelectizeInput(session, "taxons", choices = taxonTable)
-  
+  updateSelectizeInput(session, "taxons", choices = sort(taxonTable$taxon))
+
   #####-Picker input-#####
   functio_group_query<-"SELECT DISTINCT info->>'functio_group' as Fonctional_group FROM croptrait  ORDER BY info->>'functio_group';"
   functio_group<-dbGetQuery(con, functio_group_query)
@@ -49,43 +45,12 @@ function(input,output,session){
   updatePickerInput(session, "scale", choices = scaleRes)
   updatePickerInput(session, "dlScale", choices = scaleRes)
   
-  resTrait <<- dbGetQuery(conn = con,statement = traitQuery)
-  resSpecies <<- dbGetQuery(conn = con,statement = taxonQuery)
   #resAll <<- dbGetQuery(conn = con,statement = AllDataQuery)
   
   dbDisconnect(con)
     })
   })
 
-
-  #-Data reduction-#
-  dataReduction <- function(data){
-  if(dim(data)[1] > 1000){
-    return (resSampled <- data[1:1000,])
-  } else return(data)}
-  ############################-NAVIGATION-#####################################
-  observeEvent(input$trait, {
-    toggle(id="traitTable")
-    toggle(id="divSearch")
-  })
-  resTraitToPrint <- dataReduction(resTrait)
-  output$tableTrait<-renderTable(resTraitToPrint,bordered=TRUE)
-  observeEvent(input$species,toggle(id="speciesTable"))
-  output$tableSpecies<-renderTable(resSpecies,bordered=TRUE)
-  
-  ##########################-Searching the dataframe-###########################
-  observeEvent(input$search, {
-    if(input$traitText == ""){
-      resTrait<-dataReduction(resTrait)
-      output$tableTrait<-renderTable(resTrait,bordered=TRUE)
-    } else {
-    table<-data.table(resTrait)
-    setkey(table,"trait_name")
-    filteredTable<-table[grepl(input$traitText, table$trait_name, ignore.case = TRUE)]
-    filteredTable<-dataReduction(filteredTable)
-    output$tableTrait<-renderTable(filteredTable,bordered=TRUE)
-    }
-  })
   ##############################################################################
   ##########################-PLOTS-#############################################
   ##############################################################################
@@ -98,22 +63,28 @@ function(input,output,session){
     GLOPNET$SLA <- (1/GLOPNET$LMA) #m2/kg
     GLOPNET$log.SLA <- log10(GLOPNET$SLA)
     
-    taxonTable <-read.table("taxon_Table.csv",header = T,sep=";", dec=".",quote='"', fill=FALSE)
 
     ###-Reactive data for plotting-###
     myReact <- reactiveValues()
-    buttonClicked<- reactive(input$visualize)
-    
+
     ###-Add one condition to plot-###
     observeEvent(input$visualize,{
+      withProgress(message="Processing in progress",detail = "Please wait", value = 0,{
       Sample<-concatenateQuery()
+      incProgress(1/5)
       if(!is.null(Sample)){
         shinyjs::hide('resText')
+        incProgress(2/5)
         genList<-traitSplit(Sample)
+        incProgress(3/5)
+        if(length(genList[,1]) >0 & is.na(genList$filterName[1])){
+          genList$filterName<-"All Data"
+        }
         displayVisuResult(genList)
+        incProgress(4/5)
         myReact$toPlot<-rbind(myReact$toPlot,genList)
         shinyjs::show('resText')
-        }
+        }})
     })
     ###-Enable/Disable glopnet data-###
     observeEvent(input$glopnetData,{
@@ -167,6 +138,9 @@ function(input,output,session){
   visuInputNames<-c("taxon","functio_group","sampling_type")
   ####-REMPLACER FOR LOOP PAR APPLY
   visuQuery<-NULL
+  if(!is.null(c(visuInputList[[1]],visuInputList[[2]],visuInputList[[3]]))){
+    
+  
   for(i in 1:length(visuInputList)){
     if(!is.null(visuInputList[i][[1]])){
       query <- paste(noquote(visuInputNames[i])," == ",sQuote(visuInputList[i],F),sep=" ")
@@ -181,6 +155,9 @@ function(input,output,session){
       Sample<- resAll %>% filter(!! rlang::parse_expr(visuQuery))
       return(Sample)
   } else { return(NULL)}
+  } else {
+    return(resAll)
+  }
     }
   ##########################################################
   ##########-Print database matching results-###########
@@ -205,13 +182,13 @@ function(input,output,session){
   genList$filterName<-as.character(genList$filterName)
   for (i in 1:length(genotypes[[1]])){
     genSample <- filter (Sample,gen_name==genotypes[[1]][i])
-    genSample$trait_original_value <- as.double(genSample$trait_original_value)
-    genSample <- genSample %>% drop_na(trait_original_value)
+    genSample$original_value <- as.double(genSample$original_value)
+    genSample <- genSample %>% drop_na(original_value)
     genSampleSLA<-filter(genSample,trait_name == "SLA")
     genSampleLNC<-filter(genSample,trait_name == "LNC per leaf dry mass")
     if(length(genSampleSLA[[1]])>0 && length(genSampleLNC[[1]]>0)){
       genSampleSLA<-normalize(genSampleSLA)
-      genList<-genList %>% add_row(meanSLA = mean(genSampleSLA$trait_original_value), meanLNC = mean(genSampleLNC$trait_original_value), filterName = filterLegend)
+      genList<-genList %>% add_row(meanSLA = mean(genSampleSLA$original_value), meanLNC = mean(genSampleLNC$original_value), filterName = filterLegend)
     }
   }
   genList$meanSLA<-log10(genList$meanSLA)
@@ -222,11 +199,11 @@ function(input,output,session){
   
   normalize<-function(dataset){
   for(i in 1:length(dataset[,1])){
-    if(dataset[i,]$trait_original_unit == "cm2/g"){
-      dataset[i,]$trait_original_value <- dataset[i,]$trait_original_value/10
+    if(dataset[i,]$original_unit == "cm2/g"){
+      dataset[i,]$original_value <- dataset[i,]$original_value/10
     }
-    if(dataset[i,]$trait_original_unit == "cm2/mg"){
-      dataset[i,]$trait_original_value <- dataset[i,]$trait_original_value*100
+    if(dataset[i,]$original_unit == "cm2/mg"){
+      dataset[i,]$original_value <- dataset[i,]$original_value*100
     }
   }
   return(dataset)
