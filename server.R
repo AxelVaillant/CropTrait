@@ -335,4 +335,10 @@ function(input,output,session){
         file.copy("fieldsDescription.xlsx",file)
       }
     )
+      output$taxonTable <- downloadHandler(
+      filename = "taxon_Table.csv",
+      content = function(file) {
+        file.copy("taxon_Table.csv",file)
+      }
+    )
   }
