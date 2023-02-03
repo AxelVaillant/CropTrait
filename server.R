@@ -23,6 +23,7 @@ function(input,output,session){
 
   ###-Selectize input-###
   updateSelectizeInput(session, "taxons", choices = sort(taxonTable$taxon))
+  updatePickerInput(session, "varSpecies", choices = sort(taxonTable$taxon))
 
   #####-Picker input-#####
   functio_group_query<-"SELECT DISTINCT info->>'functio_group' as Fonctional_group FROM croptrait  ORDER BY info->>'functio_group';"
@@ -39,10 +40,11 @@ function(input,output,session){
   trait_query<-"SELECT DISTINCT info->>'trait_name' as trait_name FROM croptrait  ORDER BY info->>'trait_name';"
   traits<-dbGetQuery(con, trait_query)
   updatePickerInput(session, "dlTraits", choices = traits)
+  updateSelectInput(session, "varTraits", choices = traits)
   
   scale_query<-"SELECT DISTINCT info->>'traitmeas_scale' as traitmeas_scale FROM croptrait  ORDER BY info->>'traitmeas_scale';"
   scaleRes<-dbGetQuery(con, scale_query)
-  updatePickerInput(session, "scale", choices = scaleRes)
+  #updatePickerInput(session, "scale", choices = scaleRes)
   updatePickerInput(session, "dlScale", choices = scaleRes)
   
   #resAll <<- dbGetQuery(conn = con,statement = AllDataQuery)
@@ -75,7 +77,11 @@ function(input,output,session){
       if(!is.null(Sample)){
         shinyjs::hide('resText')
         incProgress(2/5)
-        genList<-traitSplit(Sample)
+        if(input$visuType == "By individual"){
+          genList<-traitSplitByIndAlternate(Sample)
+        } else if(input$visuType == "By genotype"){
+          genList<-traitSplit(Sample)
+        }
         incProgress(3/5)
         if(length(genList[,1]) >0 & is.na(genList$filterName[1])){
           genList$filterName<-"All Data"
@@ -173,10 +179,23 @@ function(input,output,session){
         paste("Your filters match ",length(genList[[1]]) ," unique genotypes in the database.", sep="")
         })
     }}
-  
+  ###-Trait variability / Taxon res-###
+  taxonByTraitResult<-function(list){
+    if(length(list[,1])==0){
+          output$traitVarText<-renderText({
+          paste("There is no matching data of this taxon for this trait.",
+                     "Please retry with another taxon", sep="\n ")
+        })
+    } else {
+        output$traitVarText<-renderText({
+        paste("There are ",length(list[,1]) ," individuals matching those filters in the database.", sep="")
+        })
+    }}    
+    
   traitSplit<-function(Sample){
   filterLegend<-legendHandler()  
   genotypes<-(Sample %>% distinct(gen_name))
+  genotypes<-drop_na(genotypes)
   genList<-data.frame(matrix(ncol=3,nrow=0))
   colnames(genList) <-c('meanSLA','meanLNC','filterName')
   genList$filterName<-as.character(genList$filterName)
@@ -195,6 +214,84 @@ function(input,output,session){
   genList$meanLNC<-log10(genList$meanLNC)
   ##
   return(genList)
+  }
+  
+  traitSplitByIndAlternate<-function(Sample){
+  filterLegend<-legendHandler()  
+  indList<-data.frame(matrix(ncol=3,nrow=0))
+  colnames(indList) <-c('meanSLA','meanLNC','filterName')
+  indList$filterName<-as.character(indList$filterName)
+    indSample <-Sample
+    indSample$original_value <- as.double(indSample$original_value)
+    indSample <- indSample %>% drop_na(original_value)
+    indSampleSLA<-filter(indSample,trait_name == "SLA")
+    indSampleLNC<-filter(indSample,trait_name == "LNC per leaf dry mass")
+    if(length(indSampleSLA[[1]])>0 && length(indSampleLNC[[1]]>0)){
+    if(length(indSampleSLA[,1]) != length(indSampleLNC[,1])){
+      matchingInd<-intersect(indSampleLNC$id_occurence,indSampleSLA$id_occurence)
+      if(length(matchingInd)>0){
+      for(i in 1:length(matchingInd)){
+      indexSLA<- match(matchingInd[i],indSampleSLA$id_occurence)
+      indexLNC<- match(matchingInd[i],indSampleLNC$id_occurence)
+      indList<-indList %>% add_row(meanSLA = indSampleSLA[indexSLA,]$standardized_value, meanLNC = indSampleLNC[indexLNC,]$standardized_value, filterName = filterLegend)
+      }}
+    } else {
+        for (i in 1:length(Sample[,1])){
+          indList<-indList %>% add_row(meanSLA = indSampleSLA[i,]$standardized_value, meanLNC = indSampleLNC[i,]$standardized_value, filterName = filterLegend)
+        }
+    }
+      }
+  indList$meanSLA<-log10(indList$meanSLA)
+  indList$meanLNC<-log10(indList$meanLNC)
+  ##
+  return(indList)
+  }
+  
+  traitSplitByInd<-function(Sample){
+  filterLegend<-legendHandler()  
+  indList<-data.frame(matrix(ncol=3,nrow=0))
+  colnames(indList) <-c('meanSLA','meanLNC','filterName')
+  indList$filterName<-as.character(indList$filterName)
+    indSample <-Sample
+    indSample$original_value <- as.double(indSample$original_value)
+    indSample <- indSample %>% drop_na(original_value)
+    indSampleSLA<-filter(indSample,trait_name == "SLA")
+    indSampleLNC<-filter(indSample,trait_name == "LNC per leaf dry mass")
+    if(length(indSampleSLA[[1]])>0 && length(indSampleLNC[[1]]>0)){
+    if(length(indSampleSLA[,1]) != length(indSampleLNC[,1])){
+    smaller <-min(length(indSampleSLA[,1]),length(indSampleLNC[,1]))
+    if(length(indSampleLNC[,1]) == smaller){
+      for(j in 1:smaller){
+        print(paste("j = " ,j,sep=""))
+        id = indSampleLNC[j,]$id_occurence
+        for(iterator in 1:length(indSampleSLA[,1])){
+         if(indSampleSLA[iterator,]$id_occurence == id){
+           indList<-indList %>% add_row(meanSLA = indSampleSLA[iterator,]$standardized_value, meanLNC = indSampleLNC[j,]$standardized_value, filterName = filterLegend)
+           break
+         } 
+        }
+      }
+    } else {
+      for(j in 1:smaller){
+        id = indSampleSLA[j,]$id_occurence
+        for(iterator in 1:length(indSampleLNC[,1])){
+         if(indSampleLNC[iterator,]$id_occurence == id){
+           indList<-indList %>% add_row(meanLNC = indSampleLNC[iterator,]$standardized_value, meanSLA = indSampleSLA[j,]$standardized_value, filterName = filterLegend)
+           break
+         } 
+        }
+      }
+    }
+    } else {
+        for (i in 1:length(Sample[,1])){
+          indList<-indList %>% add_row(meanSLA = indSampleSLA[i,]$standardized_value, meanLNC = indSampleLNC[i,]$standardized_value, filterName = filterLegend)
+        }
+    }
+      }
+  indList$meanSLA<-log10(indList$meanSLA)
+  indList$meanLNC<-log10(indList$meanLNC)
+  ##
+  return(indList)
   }
   
   normalize<-function(dataset){
@@ -222,7 +319,7 @@ function(input,output,session){
         return(legendText)
   }
   ###-Reset Plot-###
-  observeEvent(input$reset,{
+  observeEvent(c(input$reset,input$visuType),{
     shinyjs::hide("resText")
     if(isTRUE(input$glopnetData)){
       myReact$toPlot <- myReact$toPlot %>% filter(filterName == "Glopnet")  
@@ -230,6 +327,59 @@ function(input,output,session){
       myReact$toPlot<-NULL  
     }
   })
+  ########################################################################
+  #########################-Trait variability-############################
+  ########################################################################
+    output$traitVariability<-renderPlot({
+      trait <- resAll %>% filter(trait_name == input$varTraits)
+      if(length(trait[,1]) > 0){
+      #-building dataframe for general traits values-#  
+      dfTrait <-data.frame(value = trait$standardized_value, unit = trait$standardized_unit, condition = trait$trait_name, dataset = "trait")
+      dfTrait<-removeOutliers(dfTrait)
+      if(!is.null(input$varSpecies)){
+      #-filter specific taxon values for the trait-#  
+      specie <- trait %>% filter(taxon == input$varSpecies)
+      if(length(specie[,1]) > 0){
+      #-dataframes concatenation-#  
+      dfTax<-data.frame(value = specie$standardized_value, unit = specie$standardized_unit, condition = specie$taxon, dataset = "taxon")
+      dfTrait<-rbind(dfTrait,dfTax)
+      dfTrait$dataset <-factor(dfTrait$dataset,levels=c("trait","taxon"))
+      #-Plotting parameters-#
+      ggplot( dfTrait,aes(x=value, fill=dataset)) +
+      geom_histogram(aes(y=..density..), color="darkblue", alpha=0.5, position = 'identity',bins=30) +
+      geom_density(alpha=.3) +
+      scale_fill_manual(values=c("lightblue", "lightcoral"),labels=c("General",dfTax[1,]$condition)) + 
+      labs(x =paste("value (",dfTrait[1,]$unit,")",sep =""),title = paste(trait[1,]$trait_name,"variability",sep=" "),fill="") +
+      theme(legend.position = c(0.9,0.9)) 
+      } else {
+        ggplot(dfTrait, aes(x = value)) +geom_histogram(color="darkblue", fill="lightblue", bins=30) +labs(x =paste("value (",dfTrait[1,]$unit,")",sep =""),title = paste(dfTrait[1,]$condition,"variability",sep=" "),)
+        }
+      } else {
+        ggplot(dfTrait, aes(x = value)) +geom_histogram(color="darkblue", fill="lightblue", bins=30) +labs(x =paste("value (",dfTrait[1,]$unit,")",sep =""),title = paste(dfTrait[1,]$condition,"variability",sep=" "),)
+      }
+      }
+      })
+  
+  observeEvent(c(input$varSpecies,input$varTraits),{
+    trait <- resAll %>% filter(trait_name == input$varTraits)
+    if(!is.null(input$varSpecies)){
+      specie <- trait %>% filter(taxon == input$varSpecies)
+      taxonByTraitResult(specie)
+    } else {
+      taxonByTraitResult(trait)
+    }
+  })
+  
+  removeOutliers<-function(df){
+    variable<-na.omit(df$value)
+    quartiles <- quantile(variable, probs=c(.25, .75), na.rm = FALSE)
+    IQR<-IQR(variable)
+    Lower <- quartiles[1] - 1.5*IQR
+    Upper <- quartiles[2] + 1.5*IQR
+    data_no_outliers<-subset(df,df$value > Lower & df$value < Upper)
+    length(data_no_outliers)
+    return(data_no_outliers)
+  }
   ########################################################################
   #############################-Download Data-############################
   ########################################################################

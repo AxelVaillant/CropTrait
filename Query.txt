@@ -33,9 +33,10 @@ info ->>'fertilization_condition'as fertilization_condition,info ->>'fertilizati
 info ->>'pesticide_condition'as pesticide_condition,info ->>'culture_type'as culture_type,info ->>'treatment_type'as treatment_type,
 info ->>'treatment_quantity'as treatment_quantity,info ->>'treatment_quantity_unit'as treatment_quantity_unit,info ->>'treatment_description'as treatment_description,
 info ->>'plant_identification'as plant_identification,info ->>'block_identification'as block_identification,info ->>'traitmeas_scale'as traitmeas_scale,
-info ->>'trait_name'as trait_name,info ->>'TOP_trait_ID'as TOP_trait_ID,info ->>'original_value'as trait_original_value,info ->>'original_unit'as trait_original_unit,
-info ->>'trait_standardized_value'as trait_standardized_value,info ->>'trait_standardized_unit'as trait_standardized_unit,info ->>'leaf_age'as leaf_age,
+info ->>'trait_name'as trait_name,info ->>'TOP_trait_ID'as TOP_trait_ID,info ->>'original_value'as original_value,info ->>'original_unit'as original_unit,
+info ->>'standardized_value'as standardized_value,info ->>'standardized_unit'as standardized_unit,info ->>'leaf_age'as leaf_age,
 info ->>'plant_age'as plant_age,info ->>'plant_age_unit'as plant_age_unit,info ->>'trait_stage'as trait_stage,
 info ->>'trait_organ'as trait_organ,info ->>'trait_methods'as trait_methods,info ->>'replicate_number'as replicate_number,
-info ->>'std_value'as std_value,info ->>'std_unit'as std_unit,info ->>'metadata_remarks'as metadata_remarks
+info ->>'std_value'as std_value,info ->>'std_unit'as std_unit,info ->>'metadata_remarks'as metadata_remarks,
+info ->>'dataset_name'as dataset_name
 from croptrait;
