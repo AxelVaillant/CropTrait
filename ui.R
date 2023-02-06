@@ -24,14 +24,12 @@ dashboardPage(
     tabItems(
       tabItem(tabName = "home",
               includeMarkdown("www/cropTraitHomepage.md")
-              #h2("Welcome to CropTrait"),
-              #p("The CropTrait Database, defined as a multiple-crops database, focuses on ecophysiological traits related to resource use and acquisition of cultivated plants"),
-              #img(src = "crop.png")
               ),
       tabItem(tabName = "visualization",h2("Database visualization"),
+              ##################-VISUALIZATION TAB-###################
+              ###-SLA VS LNC-###
               wellPanel(fluidRow(column(width = 6,checkboxInput("glopnetData","Glopnet Data",value = TRUE),radioButtons("visuType","Type of visualization",choices =list("By individual","By genotype")),
                                         selectizeInput("taxons","Taxons",choices = NULL,selected = NULL, multiple = TRUE, options = list(placeholder = 'Leave this field empty to match all taxons',maxOptions = 2500)),
-                                        #pickerInput("scale",'Scale',multiple=TRUE,choices=NULL,options = list(`actions-box` = TRUE)),
                                         pickerInput("Functional_group",'Functional group',multiple=TRUE,choices=NULL,options = list(`actions-box` = TRUE)),
                                         pickerInput("sampling_type",'Sampling type',multiple=TRUE,choices=NULL,options = list(`actions-box` = TRUE)),
                                         actionButton("visualize","Visualize"),actionButton("reset","Reset"),p(),span(verbatimTextOutput('resText'),style="text-align:center;")),
@@ -39,13 +37,17 @@ dashboardPage(
               fluidRow(column(width = 6,wellPanel(span("Select parameters of interest then click the visualize button to display the matching data on the plot.",tags$br(),
                                                       "Several conditions can be added on the same plot like layers.",
                                                       "Previous plotting can be erased by hitting the reset button.",style="font-size:16px;")))),
+              ###-TRAIT VARIABILITY-###
               h2("Trait variability"),wellPanel(fluidRow(column(width = 6,selectInput("varTraits","Trait",choices = NULL),
-                                        #pickerInput("varSpecies","Taxons",choices = NULL,selected = NULL, multiple = FALSE, options = list(`actions-box` = TRUE,maxOptions = 2500)),
-                                        pickerInput("varSpecies",'Taxons',multiple=FALSE,choices=NULL,options = list(`actions-box` = TRUE)),
+                                        selectizeInput("varSpecies",'Taxons',multiple=FALSE,choices=NULL,options = list(maxOptions = 2500)),
                                         span(verbatimTextOutput('traitVarText'),style="text-align:center;")),
                                  column(width= 6,plotOutput("traitVariability"))))),
       tabItem(tabName = "downloadTab",h2("Get Data"),
-              wellPanel(fluidRow(column(width = 6,p("Please enter a list of comma separated taxon names. Anything else will be ignored."),textAreaInput("dlTaxon","Taxon"),
+              ##################-GET DATA TAB-###################
+              wellPanel(fluidRow(column(width = 6,fluidRow(column(width = 3,radioButtons("dataAccessMode","Mode",choices =list("Public","Admin"),inline = T)),
+                                                           shinyjs::hidden(div(id="admin",column(width = 4,textInput("adminPswd","Admin Password")),column(width=2,br(),actionBttn("submitPswd","Submit",style = "jelly",color="royal",size = "sm")))),column(width = 2,br(),shinyjs::hidden(div(id="pass",span(textOutput("passError"), style="color:red"))))),
+                          #p("Please enter a list of comma separated taxon names. Anything else will be ignored."),
+                          selectizeInput("dlTaxon",'Taxons',multiple=TRUE,choices=NULL,options = list(maxOptions = 2500)),
                           pickerInput("dlScale",'Scale',multiple=TRUE,choices=NULL,options = list(`actions-box` = TRUE)),
                           pickerInput("dlTraits",'Trait',multiple=TRUE,choices=NULL,options = list(`actions-box` = TRUE)),
                           pickerInput("dlFunctional_group",'Functional group',multiple=TRUE,choices=NULL,options = list(`actions-box` = TRUE)),
@@ -58,6 +60,7 @@ dashboardPage(
                                        actionButton("submit","Submit",icon("paper-plane"))))))),
               shinyjs::hidden(downloadButton('queryDl', label="Download data",style="color: #fff; background-color: #337ab7; border-color: #2e6da4"))),
       tabItem(tabName = "contribution",h2("Contribute to the database"),
+              ##################-CONTRIBUTION TAB-###################
               HTML("<h3>Follow this link to contribute to the database : </h3>"),
               HTML("<a href=https://erc-constraints.cefe.cnrs.fr/database-croptraits/>Contribution process</a>")
               

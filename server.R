@@ -10,9 +10,6 @@ function(input,output,session){
   ###
   resAll <-read.table("DB.csv",header = T,sep=";", dec=".", fill=T)
   taxonTable <-read.table("taxon_Table.csv",header = T,sep=";", dec=".",quote='"', fill=FALSE)
-  #traits <- read.table("trait_table.csv",header = T,sep=";", dec=".",quote='"', fill=FALSE)
-  #functio_group <- read.table("functio_group_table.csv",header = T,sep=";", dec=".",quote='"', fill=FALSE)
-  #sampling_type <- read.table("sampling_type_table.csv",header = T,sep=";", dec=".",quote='"', fill=FALSE)
 
   #######################################################
   ################-DATABASE MANAGEMENT-##################
@@ -22,8 +19,9 @@ function(input,output,session){
   con <- dbConnect(RPostgres::Postgres(), dbname= "CropTrait", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
 
   ###-Selectize input-###
-  updateSelectizeInput(session, "taxons", choices = sort(taxonTable$taxon))
-  updatePickerInput(session, "varSpecies", choices = sort(taxonTable$taxon))
+  updateSelectizeInput(session, "taxons", choices = sort(taxonTable$taxon),server = T)
+  updateSelectizeInput(session, "varSpecies", choices = c("",sort(taxonTable$taxon)),server = T)
+  updateSelectizeInput(session, "dlTaxon", choices = sort(taxonTable$taxon),server = T)
 
   #####-Picker input-#####
   functio_group_query<-"SELECT DISTINCT info->>'functio_group' as Fonctional_group FROM croptrait  ORDER BY info->>'functio_group';"
@@ -44,7 +42,6 @@ function(input,output,session){
   
   scale_query<-"SELECT DISTINCT info->>'traitmeas_scale' as traitmeas_scale FROM croptrait  ORDER BY info->>'traitmeas_scale';"
   scaleRes<-dbGetQuery(con, scale_query)
-  #updatePickerInput(session, "scale", choices = scaleRes)
   updatePickerInput(session, "dlScale", choices = scaleRes)
   
   #resAll <<- dbGetQuery(conn = con,statement = AllDataQuery)
@@ -78,7 +75,7 @@ function(input,output,session){
         shinyjs::hide('resText')
         incProgress(2/5)
         if(input$visuType == "By individual"){
-          genList<-traitSplitByIndAlternate(Sample)
+          genList<-traitSplitByInd(Sample)
         } else if(input$visuType == "By genotype"){
           genList<-traitSplit(Sample)
         }
@@ -192,6 +189,7 @@ function(input,output,session){
         })
     }}    
     
+  ##########-Filtering by genotypes-###########
   traitSplit<-function(Sample){
   filterLegend<-legendHandler()  
   genotypes<-(Sample %>% distinct(gen_name))
@@ -216,7 +214,8 @@ function(input,output,session){
   return(genList)
   }
   
-  traitSplitByIndAlternate<-function(Sample){
+  ##########-Filtering by individuals-###########
+  traitSplitByInd<-function(Sample){
   filterLegend<-legendHandler()  
   indList<-data.frame(matrix(ncol=3,nrow=0))
   colnames(indList) <-c('meanSLA','meanLNC','filterName')
@@ -246,53 +245,7 @@ function(input,output,session){
   ##
   return(indList)
   }
-  
-  traitSplitByInd<-function(Sample){
-  filterLegend<-legendHandler()  
-  indList<-data.frame(matrix(ncol=3,nrow=0))
-  colnames(indList) <-c('meanSLA','meanLNC','filterName')
-  indList$filterName<-as.character(indList$filterName)
-    indSample <-Sample
-    indSample$original_value <- as.double(indSample$original_value)
-    indSample <- indSample %>% drop_na(original_value)
-    indSampleSLA<-filter(indSample,trait_name == "SLA")
-    indSampleLNC<-filter(indSample,trait_name == "LNC per leaf dry mass")
-    if(length(indSampleSLA[[1]])>0 && length(indSampleLNC[[1]]>0)){
-    if(length(indSampleSLA[,1]) != length(indSampleLNC[,1])){
-    smaller <-min(length(indSampleSLA[,1]),length(indSampleLNC[,1]))
-    if(length(indSampleLNC[,1]) == smaller){
-      for(j in 1:smaller){
-        print(paste("j = " ,j,sep=""))
-        id = indSampleLNC[j,]$id_occurence
-        for(iterator in 1:length(indSampleSLA[,1])){
-         if(indSampleSLA[iterator,]$id_occurence == id){
-           indList<-indList %>% add_row(meanSLA = indSampleSLA[iterator,]$standardized_value, meanLNC = indSampleLNC[j,]$standardized_value, filterName = filterLegend)
-           break
-         } 
-        }
-      }
-    } else {
-      for(j in 1:smaller){
-        id = indSampleSLA[j,]$id_occurence
-        for(iterator in 1:length(indSampleLNC[,1])){
-         if(indSampleLNC[iterator,]$id_occurence == id){
-           indList<-indList %>% add_row(meanLNC = indSampleLNC[iterator,]$standardized_value, meanSLA = indSampleSLA[j,]$standardized_value, filterName = filterLegend)
-           break
-         } 
-        }
-      }
-    }
-    } else {
-        for (i in 1:length(Sample[,1])){
-          indList<-indList %>% add_row(meanSLA = indSampleSLA[i,]$standardized_value, meanLNC = indSampleLNC[i,]$standardized_value, filterName = filterLegend)
-        }
-    }
-      }
-  indList$meanSLA<-log10(indList$meanSLA)
-  indList$meanLNC<-log10(indList$meanLNC)
-  ##
-  return(indList)
-  }
+
   
   normalize<-function(dataset){
   for(i in 1:length(dataset[,1])){
@@ -336,7 +289,7 @@ function(input,output,session){
       #-building dataframe for general traits values-#  
       dfTrait <-data.frame(value = trait$standardized_value, unit = trait$standardized_unit, condition = trait$trait_name, dataset = "trait")
       dfTrait<-removeOutliers(dfTrait)
-      if(!is.null(input$varSpecies)){
+      if(input$varSpecies!=""){
       #-filter specific taxon values for the trait-#  
       specie <- trait %>% filter(taxon == input$varSpecies)
       if(length(specie[,1]) > 0){
@@ -362,7 +315,7 @@ function(input,output,session){
   
   observeEvent(c(input$varSpecies,input$varTraits),{
     trait <- resAll %>% filter(trait_name == input$varTraits)
-    if(!is.null(input$varSpecies)){
+    if(input$varSpecies!=""){
       specie <- trait %>% filter(taxon == input$varSpecies)
       taxonByTraitResult(specie)
     } else {
@@ -383,6 +336,8 @@ function(input,output,session){
   ########################################################################
   #############################-Download Data-############################
   ########################################################################
+  
+  ###-Concatenate query-###
   dbManagement<- function(con){
   filterList<-""
   inputList<-list(input$dlTaxon,input$scale,input$dlTraits,input$dlFunctional_group,input$dlSampling_type)
@@ -390,26 +345,19 @@ function(input,output,session){
   for(i in 1:length(inputList)){
     if(!is.null(inputList[i][[1]]) &&  !inputList[i]==""){
       if(length(inputList[i][[1]]) >1){
-        inputList[i][[1]]<-str_replace_all(toString(inputList[i][[1]])," ","")
         inputList[i][[1]]<-sapply(strsplit(inputList[i][[1]],","), function(x) toString(sQuote(x,F)))
-        inputList[i][[1]]<-str_replace_all(inputList[i][[1]]," ","")
-      } else if (i == 1){
-        inputList[i][[1]]<-taxonHandler(inputList[i][[1]])
-      } else { inputList[i][[1]] <- sQuote(inputList[i][[1]],F)}
-      filterList<-c(filterList,paste(" info ->>'",inputNameList[i],"' in (",inputList[i],")",sep=""))
+        inputs<-NULL
+        inputs<-paste(inputList[i][[1]],collapse=",")
+      }
+      filterList<-c(filterList,paste(" info ->>'",inputNameList[i],"' in (",inputs,")",sep=""))
       #sql <- paste("info ->>'",inputNameList[i],"' in (?input)",sep="")
-      #query<-sqlInterpolate(con,sql,input=inputList[i][[1]])
-      #filterList<-c(filterList,paste(" info ->>'",inputNameList[i],"' in (",inputList[i],")",sep=""))
+      #query<-sqlInterpolate(con,sql,input=inputs)
     }
   }
     filterList<- paste(filterList, collapse = " and ")
     filterList<-substr(filterList,5,nchar(filterList))
     return(filterList)
   }
-
-  q<-"WHERE info ->>'taxon' in ('Daucus carota') and info->>'trait_name' in ('SLA') and info ->>'functio_group' in ('Graminoid') and
-  info ->>'sampling_type' ('Field') and info ->>'traitmeas_scale' ('Plant');"  
-    
   
   observeEvent(input$runQuery,{
     shinyjs::hide("queryDl")
@@ -419,15 +367,21 @@ function(input,output,session){
     filterList<-dbManagement(con)
     AllDataQuery <- paste(readLines("Query.txt"), collapse=" ")
     if(!filterList==""){
-          filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"WHERE info->>'data_access' in ('Public','Public (notify the PIs)') and",filterList," ORDER BY info->>'id_bdd';",sep =" ")
-          print(filteredQuery)
-    } else {filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"WHERE info->>'data_access' in ('Public','Public (notify the PIs)') ORDER BY info->>'id_bdd';",sep =" ")}
+      ifelse(isTRUE(adminMode$isAdmin),
+             filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"WHERE",filterList," ORDER BY info->>'id_bdd';",sep =" "),
+             filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"WHERE info->>'data_access' in ('Public','Public (notify the PIs)') and",filterList," ORDER BY info->>'id_bdd';",sep =" "))
+      print(filteredQuery)
+    } else {
+      ifelse(isTRUE(adminMode$isAdmin),
+             filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"ORDER BY info->>'id_bdd';",sep =" "),
+             filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"WHERE info->>'data_access' in ('Public','Public (notify the PIs)') ORDER BY info->>'id_bdd';",sep =" "))
+      }
     incProgress(1/2)
     res <<- dbGetQuery(conn = con,statement = filteredQuery)
     dbDisconnect(con)
     
     userData<<- res %>% filter(data_access == "Public (notify the PIs)")
-    if(length(userData[,1])>0){
+    if(length(userData[,1])>0 & !isTRUE(adminMode$isAdmin)){
       shinyjs::show("userInfos")
     } else {
     write.table(res,"queryRes.csv",sep = ";",row.names = FALSE)
@@ -444,6 +398,37 @@ function(input,output,session){
     return(editedTaxonInput)
   }
   
+  #####################################################
+  ###############-Admin access to data#################
+  observeEvent(input$dataAccessMode,{
+    if(input$dataAccessMode == "Admin"){
+      shinyjs::show("admin")
+    } else {
+      shinyjs::hide("admin")
+      updateTextInput(session,"adminPswd",value = "")
+      adminMode$pass<-""
+      adminMode$isAdmin<-FALSE
+      shinyjs::hide("pass")
+    }
+  })
+
+  adminMode<-reactiveValues()
+  adminMode$message<-""
+  adminMode$isAdmin<-FALSE
+  observeEvent(input$submitPswd,{
+    if(input$adminPswd == "croptraitpass2023"){
+      adminMode$message<- "Admin mode"
+      adminMode$isAdmin<-TRUE
+      shinyjs::hide("admin")
+    } else {
+      adminMode$message<-"Invalid password"
+    }
+    shinyjs::show("pass")
+  })
+  
+  output$passError<-renderText({
+    adminMode$message
+  })
   #####################################################
   ###############-Check data access-###################
   isInfosFilled<-observeEvent(input$submit,{
