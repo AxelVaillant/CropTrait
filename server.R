@@ -340,15 +340,13 @@ function(input,output,session){
   ###-Concatenate query-###
   dbManagement<- function(con){
   filterList<-""
+  inputs<-NULL
   inputList<-list(input$dlTaxon,input$scale,input$dlTraits,input$dlFunctional_group,input$dlSampling_type)
   inputNameList<-list("taxon","traitmeas_scale","trait_name","functio_group","sampling_type")
   for(i in 1:length(inputList)){
     if(!is.null(inputList[i][[1]]) &&  !inputList[i]==""){
-      if(length(inputList[i][[1]]) >1){
-        inputList[i][[1]]<-sapply(strsplit(inputList[i][[1]],","), function(x) toString(sQuote(x,F)))
-        inputs<-NULL
-        inputs<-paste(inputList[i][[1]],collapse=",")
-      }
+      inputList[i][[1]]<-sapply(strsplit(inputList[i][[1]],","), function(x) toString(sQuote(x,F)))
+      inputs<-paste(inputList[i][[1]],collapse=",")
       filterList<-c(filterList,paste(" info ->>'",inputNameList[i],"' in (",inputs,")",sep=""))
       #sql <- paste("info ->>'",inputNameList[i],"' in (?input)",sep="")
       #query<-sqlInterpolate(con,sql,input=inputs)

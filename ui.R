@@ -54,16 +54,16 @@ dashboardPage(
                           pickerInput("dlSampling_type",'Sampling type',multiple=TRUE,choices=NULL,options = list(`actions-box` = TRUE)),
                           actionButton("runQuery","Get data")),
                           column(width=6,downloadButton('fieldDesc', label="Fields description"),downloadButton('taxonTable', label="Taxon table"),
-                                       shinyjs::hidden(div(id="userInfos",style="margin-top:175px",
+                                       HTML("<h4 style=margin-top:50px;>Filter the database regarding you needs. If a field is left empty, no filter will be applied on this field.
+                                            For example : no taxons selected means that all taxons will be returned.</h4>"),
+                                       shinyjs::hidden(div(id="userInfos",style="margin-top:90px",
                                        span("Owners of some of the data you selected will be informed about the download. Please provide a valid email adress (mandatory) and a summary of your project (optional).",style="color:#9e0f08;font-size:16px;"),
                                        textInput("userMail","Email"),textAreaInput("projectSummary","Project summary"),
                                        actionButton("submit","Submit",icon("paper-plane"))))))),
               shinyjs::hidden(downloadButton('queryDl', label="Download data",style="color: #fff; background-color: #337ab7; border-color: #2e6da4"))),
-      tabItem(tabName = "contribution",h2("Contribute to the database"),
+      tabItem(tabName = "contribution",
               ##################-CONTRIBUTION TAB-###################
-              HTML("<h3>Follow this link to contribute to the database : </h3>"),
-              HTML("<a href=https://erc-constraints.cefe.cnrs.fr/database-croptraits/>Contribution process</a>")
-              
+              includeMarkdown("www/contributionPage.md")
     )
   )
 )
