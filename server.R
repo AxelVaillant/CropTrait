@@ -1,3 +1,4 @@
+plan(multisession)
 function(input,output,session){
   
   #-------Get credentials----------------------#
@@ -66,6 +67,21 @@ function(input,output,session){
     ###-Reactive data for plotting-###
     myReact <- reactiveValues()
 
+        ###-Add one condition to plot-###
+  #  observeEvent(input$visualizeR,{
+  #    tampon<-myReact$toPlot
+  #    future_promise({
+  #      return((concatenateQuery()))
+  #    }) %...>%(function(Sample){
+  #      genList<-traitSplitByInd(Sample)
+  #      tampon<<-rbind(tampon,genList) 
+  #      })%...!%(function(error){
+  #      myReact$toPlot<-NULL
+  #      warning("Plot Error")
+  #    }) 
+  #    })
+    
+    
     ###-Add one condition to plot-###
     observeEvent(input$visualize,{
       withProgress(message="Processing in progress",detail = "Please wait", value = 0,{
@@ -288,7 +304,9 @@ function(input,output,session){
       if(length(trait[,1]) > 0){
       #-building dataframe for general traits values-#  
       dfTrait <-data.frame(value = trait$standardized_value, unit = trait$standardized_unit, condition = trait$trait_name, dataset = "trait")
-      dfTrait<-removeOutliers(dfTrait)
+      if(input$varTraits!="Leaf Thickness"){
+       dfTrait<-removeOutliers(dfTrait) 
+      }
       if(input$varSpecies!=""){
       #-filter specific taxon values for the trait-#  
       specie <- trait %>% filter(taxon == input$varSpecies)
