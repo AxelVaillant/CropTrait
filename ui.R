@@ -14,18 +14,19 @@ dashboardPage(
       menuItem("Home", tabName = "home", icon=icon("house")),
       menuItem("Visualization", tabName = "visualization", icon=icon("chart-line")),
       menuItem("Get Data", tabName = "downloadTab", icon=icon("download")),
-      menuItem("Contribution", tabName = "contribution", icon=icon("share"))
+      menuItem("Contribution", tabName = "contribution", icon=icon("share")),
+      menuItem("About", tabName = "about", icon=icon("question"))
     )
   ),
   dashboardBody(
-    tags$head(tags$link(rel="shortcut icon", href="favicon.ico")),
+    tags$head(tags$link(rel="shortcut icon", href="faviconOld.ico")),
     useShinyjs(),
     includeCSS("www/style.css"),
     tabItems(
       tabItem(tabName = "home",
               includeMarkdown("www/cropTraitHomepage.md")
               ),
-      tabItem(tabName = "visualization",h2("Database visualization"),
+      tabItem(tabName = "visualization",h2("Relationship between SLA and LNC "),
               ##################-VISUALIZATION TAB-###################
               ###-SLA VS LNC-###
               wellPanel(fluidRow(column(width = 6,checkboxInput("glopnetData","Glopnet Data",value = TRUE),radioButtons("visuType","Type of visualization",choices =list("By individual","By genotype")),
@@ -64,7 +65,10 @@ dashboardPage(
       tabItem(tabName = "contribution",
               ##################-CONTRIBUTION TAB-###################
               includeMarkdown("www/contributionPage.md")
-    )
+    ),
+    ##################-ABOUT TAB-###################
+    tabItem(tabName = "about",
+             includeMarkdown("www/about.md"))
   )
 )
 )

@@ -17,8 +17,8 @@ function(input,output,session){
   observe({
     tryCatch({
         AllDataQuery <- paste(readLines("Query.txt"), collapse="\n")
-  con <- dbConnect(RPostgres::Postgres(), dbname= "CropTrait", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
-
+  #con <- dbConnect(RPostgres::Postgres(), dbname= "CropTrait", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
+  con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
   ###-Selectize input-###
   updateSelectizeInput(session, "taxons", choices = sort(taxonTable$taxon),server = T)
   updateSelectizeInput(session, "varSpecies", choices = c("",sort(taxonTable$taxon)),server = T)
@@ -56,7 +56,7 @@ function(input,output,session){
   ##############################################################################
   
   ####-GLOPNET-####
-    GLOPNET <-read.table("/home/vaillant/Documents/BDD_Hybride/BDDCROPTRAIT/axel/Croptrait/02_data/GLOPNETdata.csv",header = T,sep=";", dec=".",quote="", fill=FALSE)
+    GLOPNET <-read.table("GLOPNETdata.csv",header = T,sep=";", dec=".",quote="", fill=FALSE)
     str(GLOPNET)
     GLOPNET$LMA <- 10^(GLOPNET$log.LMA) #g/m2
     GLOPNET$LMA <- GLOPNET$LMA *10^-3 #kg/m2
@@ -67,19 +67,18 @@ function(input,output,session){
     ###-Reactive data for plotting-###
     myReact <- reactiveValues()
 
-        ###-Add one condition to plot-###
-  #  observeEvent(input$visualizeR,{
-  #    tampon<-myReact$toPlot
-  #    future_promise({
-  #      return((concatenateQuery()))
-  #    }) %...>%(function(Sample){
-  #      genList<-traitSplitByInd(Sample)
-  #      tampon<<-rbind(tampon,genList) 
-  #      })%...!%(function(error){
-  #      myReact$toPlot<-NULL
-  #      warning("Plot Error")
-  #    }) 
-  #    })
+        ###-Asynchrone-###
+ #  observeEvent(input$visualizeR,{
+ #    future_promise({
+ #      return((concatenateQuery()))
+ #    }) %...>%(function(Sample){
+ #      genList<-traitSplitByInd(Sample)
+ #      myReact$toPlot<-rbind(myReact$toPlot,genList) 
+ #      })%...!%(function(error){
+ #      myReact$toPlot<-NULL
+ #      warning("Plot Error")
+ #    }) 
+ #    })
     
     
     ###-Add one condition to plot-###
@@ -215,13 +214,13 @@ function(input,output,session){
   genList$filterName<-as.character(genList$filterName)
   for (i in 1:length(genotypes[[1]])){
     genSample <- filter (Sample,gen_name==genotypes[[1]][i])
-    genSample$original_value <- as.double(genSample$original_value)
-    genSample <- genSample %>% drop_na(original_value)
+    genSample$standardized_value <- as.double(genSample$standardized_value)
+    genSample <- genSample %>% drop_na(standardized_value)
     genSampleSLA<-filter(genSample,trait_name == "SLA")
     genSampleLNC<-filter(genSample,trait_name == "LNC per leaf dry mass")
     if(length(genSampleSLA[[1]])>0 && length(genSampleLNC[[1]]>0)){
-      genSampleSLA<-normalize(genSampleSLA)
-      genList<-genList %>% add_row(meanSLA = mean(genSampleSLA$original_value), meanLNC = mean(genSampleLNC$original_value), filterName = filterLegend)
+      #genSampleSLA<-normalize(genSampleSLA)
+      genList<-genList %>% add_row(meanSLA = mean(genSampleSLA$standardized_value), meanLNC = mean(genSampleLNC$original_value), filterName = filterLegend)
     }
   }
   genList$meanSLA<-log10(genList$meanSLA)
@@ -237,8 +236,8 @@ function(input,output,session){
   colnames(indList) <-c('meanSLA','meanLNC','filterName')
   indList$filterName<-as.character(indList$filterName)
     indSample <-Sample
-    indSample$original_value <- as.double(indSample$original_value)
-    indSample <- indSample %>% drop_na(original_value)
+    indSample$standardized_value <- as.double(indSample$standardized_value)
+    indSample <- indSample %>% drop_na(standardized_value)
     indSampleSLA<-filter(indSample,trait_name == "SLA")
     indSampleLNC<-filter(indSample,trait_name == "LNC per leaf dry mass")
     if(length(indSampleSLA[[1]])>0 && length(indSampleLNC[[1]]>0)){
@@ -248,11 +247,11 @@ function(input,output,session){
       for(i in 1:length(matchingInd)){
       indexSLA<- match(matchingInd[i],indSampleSLA$id_occurence)
       indexLNC<- match(matchingInd[i],indSampleLNC$id_occurence)
-      indList<-indList %>% add_row(meanSLA = indSampleSLA[indexSLA,]$standardized_value, meanLNC = indSampleLNC[indexLNC,]$standardized_value, filterName = filterLegend)
+      indList<-indList %>% add_row(meanSLA = indSampleSLA[indexSLA,]$standardized_value, meanLNC = indSampleLNC[indexLNC,]$original_value, filterName = filterLegend)
       }}
     } else {
         for (i in 1:length(Sample[,1])){
-          indList<-indList %>% add_row(meanSLA = indSampleSLA[i,]$standardized_value, meanLNC = indSampleLNC[i,]$standardized_value, filterName = filterLegend)
+          indList<-indList %>% add_row(meanSLA = indSampleSLA[i,]$standardized_value, meanLNC = indSampleLNC[i,]$original_value, filterName = filterLegend)
         }
     }
       }
@@ -379,7 +378,8 @@ function(input,output,session){
     shinyjs::hide("queryDl")
     withProgress(message="Browsing database",detail = "Please wait", value = 0,{
       incProgress(1/5)
-    con <- dbConnect(RPostgres::Postgres(), dbname= "CropTrait", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
+    #con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
+    con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
     filterList<-dbManagement(con)
     AllDataQuery <- paste(readLines("Query.txt"), collapse=" ")
     if(!filterList==""){
