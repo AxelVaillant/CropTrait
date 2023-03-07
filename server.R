@@ -375,6 +375,7 @@ function(input,output,session){
   }
   
   observeEvent(input$runQuery,{
+    system(paste("mkdir ",session$token,sep = ""))
     shinyjs::hide("queryDl")
     withProgress(message="Browsing database",detail = "Please wait", value = 0,{
       incProgress(1/5)
@@ -400,7 +401,7 @@ function(input,output,session){
     if(length(userData[,1])>0 & !isTRUE(adminMode$isAdmin)){
       shinyjs::show("userInfos")
     } else {
-    write.table(res,"queryRes.csv",sep = ";",row.names = FALSE)
+    write.table(res,paste(session$token,"/queryRes.csv",sep=""),sep = ";",row.names = FALSE)
     uploadData()
     shinyjs::show("queryDl")
     }
@@ -457,7 +458,7 @@ function(input,output,session){
         system(paste("Rscript --vanilla mailSender.R",input$userMail,splited[[1]][j],input$projectSummary),wait = FALSE)
       }
     }
-    write.table(res,"queryRes.csv",sep = ";",row.names = FALSE)
+    write.table(res,paste(session$token,"/queryRes.csv",sep=""),sep = ";",row.names = FALSE)
     uploadData()
     shinyjs::show("queryDl")
     shinyjs::hide("userInfos")
@@ -476,7 +477,7 @@ function(input,output,session){
         paste("Dataset-", Sys.time(), ".csv", sep="")
       },
       content = function(file) {
-        file.copy("queryRes.csv",file)
+        file.copy(paste(session$token,"/","queryRes.csv",sep=""),file)
       }
     )
   }
@@ -492,4 +493,10 @@ function(input,output,session){
         file.copy("taxon_Table.csv",file)
       }
     )
+      
+  #Delete temporary repository
+  session$onSessionEnded(function() {
+  #deleting the session's folder
+  system(paste("rm -Rf ",session$token,sep = ""))
+  })    
   }
