@@ -20,9 +20,9 @@ function(input,output,session){
   #con <- dbConnect(RPostgres::Postgres(), dbname= "CropTrait", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
   con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
   ###-Selectize input-###
-  updateSelectizeInput(session, "taxons", choices = sort(taxonTable$taxon),server = T)
-  updateSelectizeInput(session, "varSpecies", choices = c("",sort(taxonTable$taxon)),server = T)
-  updateSelectizeInput(session, "dlTaxon", choices = sort(taxonTable$taxon),server = T)
+  updateSelectizeInput(session, "taxons", choices = taxonTable[,1],server = T)
+  updateSelectizeInput(session, "varSpecies", choices = c("",taxonTable[,1]),server = T)
+  updateSelectizeInput(session, "dlTaxon", choices = taxonTable[,1],server = T)
 
   #####-Picker input-#####
   functio_group_query<-"SELECT DISTINCT info->>'functio_group' as Fonctional_group FROM croptrait  ORDER BY info->>'functio_group';"
@@ -98,7 +98,11 @@ function(input,output,session){
         if(length(genList[,1]) >0 & is.na(genList$filterName[1])){
           genList$filterName<-"All Data"
         }
-        displayVisuResult(genList)
+        if(input$visuType == "By individual"){
+          displayVisuResultInd(genList)
+        } else if(input$visuType == "By genotype"){
+          displayVisuResultGen(genList)
+        }
         incProgress(4/5)
         myReact$toPlot<-rbind(myReact$toPlot,genList)
         shinyjs::show('resText')
@@ -157,11 +161,27 @@ function(input,output,session){
   ####-REMPLACER FOR LOOP PAR APPLY
   visuQuery<-NULL
   if(!is.null(c(visuInputList[[1]],visuInputList[[2]],visuInputList[[3]]))){
-    
-  
   for(i in 1:length(visuInputList)){
     if(!is.null(visuInputList[i][[1]])){
-      query <- paste(noquote(visuInputNames[i])," == ",sQuote(visuInputList[i],F),sep=" ")
+      ###particular case for taxons
+      if(i==1){
+        dfTaxons<-NameSpliter(input$taxons)
+        if(length(dfTaxons$allGenus)==1){
+        genusQuery<-paste(noquote("genus %in% "),sQuote(dfTaxons$allGenus,F),sep=" ")
+        specieQuery<-  paste(noquote("species %in% "),sQuote(dfTaxons$allSpecie,F),sep=" ")
+        } else {
+        genusQuery<-paste(noquote("genus %in% "),list(dfTaxons$allGenus),sep=" ")
+        specieQuery<-  paste(noquote("species %in% "),list(dfTaxons$allSpecie),sep=" ")
+        }
+        query<-paste(genusQuery,specieQuery,sep=" & ")
+      } else {
+        ###functio_group and sampling_type
+         if(length(visuInputList[i][[1]])==1){
+           query <- paste(noquote(visuInputNames[i])," %in% ",sQuote(visuInputList[i],F),sep=" ")
+         } else {
+           query <- paste(noquote(visuInputNames[i])," %in% ",visuInputList[i],sep=" ")
+         }
+      }
       if(is.null(visuQuery)){
         visuQuery<-query
       } else {
@@ -170,6 +190,7 @@ function(input,output,session){
           }
   }
   if(!is.null(visuQuery)){
+    ###filtering
       Sample<- resAll %>% filter(!! rlang::parse_expr(visuQuery))
       return(Sample)
   } else { return(NULL)}
@@ -180,7 +201,7 @@ function(input,output,session){
   ##########################################################
   ##########-Print database matching results-###########
   ##########################################################
-  displayVisuResult<-function(genList){
+  displayVisuResultGen<-function(genList){
     if(length(genList[[1]])==0){
           output$resText<-renderText({
           paste("Your filters doesn't match any SLA/LNC couple in the database.",
@@ -191,6 +212,17 @@ function(input,output,session){
         paste("Your filters match ",length(genList[[1]]) ," unique genotypes in the database.", sep="")
         })
     }}
+  displayVisuResultInd<-function(genList){
+    if(length(genList[[1]])==0){
+          output$resText<-renderText({
+          paste("Your filters doesn't match any SLA/LNC couple in the database.",
+                     "Please retry with other criteria", sep="\n ")
+        })
+    } else {
+        output$resText<-renderText({
+        paste("Your filters match ",length(genList[[1]]) ," individuals in the database.", sep="")
+        })
+    }}  
   ###-Trait variability / Taxon res-###
   taxonByTraitResult<-function(list){
     if(length(list[,1])==0){
@@ -308,7 +340,8 @@ function(input,output,session){
       }
       if(input$varSpecies!=""){
       #-filter specific taxon values for the trait-#  
-      specie <- trait %>% filter(taxon == input$varSpecies)
+      splitedTaxon<-NameSpliter(input$varSpecies)
+      specie <- trait %>% filter(genus == splitedTaxon$allGenus & species == splitedTaxon$allSpecie)
       if(length(specie[,1]) > 0){
       #-dataframes concatenation-#  
       dfTax<-data.frame(value = specie$standardized_value, unit = specie$standardized_unit, condition = specie$taxon, dataset = "taxon")
@@ -333,7 +366,8 @@ function(input,output,session){
   observeEvent(c(input$varSpecies,input$varTraits),{
     trait <- resAll %>% filter(trait_name == input$varTraits)
     if(input$varSpecies!=""){
-      specie <- trait %>% filter(taxon == input$varSpecies)
+      splitedTaxon<-NameSpliter(input$varSpecies)
+      specie <- trait %>% filter(genus == splitedTaxon$allGenus & species == splitedTaxon$allSpecie)
       taxonByTraitResult(specie)
     } else {
       taxonByTraitResult(trait)
@@ -353,9 +387,36 @@ function(input,output,session){
   ########################################################################
   #############################-Download Data-############################
   ########################################################################
-  
   ###-Concatenate query-###
   dbManagement<- function(con){
+  filterList<-NULL
+  allGenus<-NULL
+  allSpecie<-NULL
+  inputs<-NULL
+  inputList<-list(input$dlTaxon,input$scale,input$dlTraits,input$dlFunctional_group,input$dlSampling_type)
+  inputNameList<-list("taxon","traitmeas_scale","trait_name","functio_group","sampling_type")
+  for(i in 1:length(inputList)){
+    if(!is.null(inputList[i][[1]]) &&  !inputList[i]==""){
+      if(i==1){
+        splited<-NameSpliter(input$dlTaxon)
+        for(iterator in 1:length(splited$allGenus)){
+          splited$allGenus[iterator]<-sQuote(splited$allGenus[iterator],F)
+          splited$allSpecie[iterator]<-sQuote(splited$allSpecie[iterator],F)
+        }
+        filterList<-c(filterList,paste(" info ->>'genus' in (",paste(splited$allGenus,collapse=","),")",sep=""))
+        filterList<-c(filterList,paste(" info ->>'species' in (",paste(splited$allSpecie,collapse=","),")",sep=""))
+      } else {
+      inputList[i][[1]]<-sapply(strsplit(inputList[i][[1]],","), function(x) toString(sQuote(x,F)))
+      inputs<-paste(inputList[i][[1]],collapse=",")
+      filterList<-c(filterList,paste(" info ->>'",inputNameList[i],"' in (",inputs,")",sep=""))
+      }
+    }
+  }  
+    filterList<- paste(filterList, collapse = " and ")
+    return(filterList)
+  }
+  ###-Concatenate query-###
+  dbManagement2<- function(con){
   filterList<-""
   inputs<-NULL
   inputList<-list(input$dlTaxon,input$scale,input$dlTraits,input$dlFunctional_group,input$dlSampling_type)
@@ -374,6 +435,22 @@ function(input,output,session){
     return(filterList)
   }
   
+  #######################
+  #-Taxon name spliter-#
+  #######################
+    NameSpliter<-function(list){
+    allGenus<-NULL
+    allSpecie<-NULL
+        for(j in 1:length(list)){
+        splited<- strsplit(list[j]," ")
+        genus<-splited[[1]][1]
+        specie<-splited[[1]][2]
+        allGenus<-c(allGenus,genus)
+        allSpecie<-c(allSpecie,specie)
+        }
+        df<-data.frame(allGenus,allSpecie)
+        return(df)
+      }
   observeEvent(input$runQuery,{
     system(paste("mkdir ",session$token,sep = ""))
     shinyjs::hide("queryDl")
