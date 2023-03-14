@@ -22,7 +22,6 @@ function(input,output,session){
 
   ###-Selectize input-###
   updateSelectizeInput(session, "taxons", choices = taxonTableSpNb[,1],server = T)
-  updateSelectizeInput(session, "varSpecies", choices = c("",taxonTableSpNb[,1]),server = T)
   updateSelectizeInput(session, "dlTaxon", choices = taxonTableSpNb[,1],server = T)
 
   #####-Picker input-#####
@@ -51,7 +50,21 @@ function(input,output,session){
   dbDisconnect(con)
     })
   })
-
+  
+  ####-dynamic taxon list on trait availability-###
+  observeEvent(input$varTraits,{
+    if(input$varTraits!=""){
+        con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
+        taxonQuery<-paste("SELECT DISTINCT info->>'genus' as genus, info->>'species' as species FROM croptrait where info->>'trait_name'='",input$varTraits,"';",sep="")
+        taxonList<-dbGetQuery(con, taxonQuery)
+        dynamicList<-data.frame(matrix(nrow=0,ncol=0))
+        for(i in 1:length(taxonList$genus)){
+          dynamicList<-rbind(dynamicList,paste(taxonList[i,1],taxonList[i,2],sep=" "))
+        }
+        updateSelectizeInput(session, "varSpecies", choices = c("",dynamicList[,1]),server = T)
+        dbDisconnect(con)
+    }
+  })
   ##############################################################################
   ##########################-PLOTS-#############################################
   ##############################################################################
