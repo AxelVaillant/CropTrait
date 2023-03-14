@@ -10,8 +10,8 @@ function(input,output,session){
   
   ###
   resAll <-read.table("DB.csv",header = T,sep=";", dec=".", fill=T)
-  taxonTable <-read.table("taxon_Table.csv",header = T,sep=";", dec=".",quote='"', fill=FALSE)
-
+  taxonTable <-read.table("taxon_Table.csv",header = F,sep=";", dec=".",quote='"', fill=FALSE)
+  taxonTableSpNb <-read.table("taxon_TableSpNb.csv",header = F,sep=";", dec=".",quote='"', fill=FALSE)
   #######################################################
   ################-DATABASE MANAGEMENT-##################
   observe({
@@ -19,10 +19,11 @@ function(input,output,session){
         AllDataQuery <- paste(readLines("Query.txt"), collapse="\n")
   #con <- dbConnect(RPostgres::Postgres(), dbname= "CropTrait", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
   con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
+
   ###-Selectize input-###
-  updateSelectizeInput(session, "taxons", choices = taxonTable[,1],server = T)
-  updateSelectizeInput(session, "varSpecies", choices = c("",taxonTable[,1]),server = T)
-  updateSelectizeInput(session, "dlTaxon", choices = taxonTable[,1],server = T)
+  updateSelectizeInput(session, "taxons", choices = taxonTableSpNb[,1],server = T)
+  updateSelectizeInput(session, "varSpecies", choices = c("",taxonTableSpNb[,1]),server = T)
+  updateSelectizeInput(session, "dlTaxon", choices = taxonTableSpNb[,1],server = T)
 
   #####-Picker input-#####
   functio_group_query<-"SELECT DISTINCT info->>'functio_group' as Fonctional_group FROM croptrait  ORDER BY info->>'functio_group';"
@@ -143,11 +144,13 @@ function(input,output,session){
   #####-Build glopnet df -####
   ############################
   buildGlopnet<-function(){
-    glopnetDf<-data.frame(matrix(ncol=3,nrow=0))
-    colnames(glopnetDf) <-c('meanSLA','meanLNC','filterName')
+    glopnetDf<-data.frame(matrix(ncol=5,nrow=0))
+    colnames(glopnetDf) <-c('meanSLA','meanLNC','filterName','taxon',"variety")
     glopnetDf$filterName<-as.character(glopnetDf$filterName)
+    glopnetDf$taxon<-as.character(glopnetDf$taxon)
+    glopnetDf$variety<-as.character(glopnetDf$variety)
     for(i in 1:length(GLOPNET[,1])){
-      glopnetDf<-glopnetDf %>% add_row(meanSLA = GLOPNET[i,]$log.SLA, meanLNC = GLOPNET[i,]$log.Nmass, filterName = "Glopnet")
+      glopnetDf<-glopnetDf %>% add_row(meanSLA = GLOPNET[i,]$log.SLA, meanLNC = GLOPNET[i,]$log.Nmass, filterName = "Glopnet",taxon = GLOPNET[i,]$Species, variety = NA)
     }
     return(glopnetDf)
   }
@@ -244,6 +247,7 @@ function(input,output,session){
   genList<-data.frame(matrix(ncol=3,nrow=0))
   colnames(genList) <-c('meanSLA','meanLNC','filterName')
   genList$filterName<-as.character(genList$filterName)
+  if(!is.na(genotypes[1,])){
   for (i in 1:length(genotypes[[1]])){
     genSample <- filter (Sample,gen_name==genotypes[[1]][i])
     genSample$standardized_value <- as.double(genSample$standardized_value)
@@ -257,12 +261,13 @@ function(input,output,session){
   }
   genList$meanSLA<-log10(genList$meanSLA)
   genList$meanLNC<-log10(genList$meanLNC)
+  }
   ##
   return(genList)
   }
   
   ##########-Filtering by individuals-###########
-  traitSplitByInd<-function(Sample){
+  traitSplitByIndOld<-function(Sample){
   filterLegend<-legendHandler()  
   indList<-data.frame(matrix(ncol=3,nrow=0))
   colnames(indList) <-c('meanSLA','meanLNC','filterName')
@@ -293,6 +298,39 @@ function(input,output,session){
   return(indList)
   }
 
+  traitSplitByInd<-function(Sample){
+  filterLegend<-legendHandler()  
+  indList<-data.frame(matrix(ncol=5,nrow=0))
+  colnames(indList) <-c('meanSLA','meanLNC','filterName',"taxon","variety")
+  indList$filterName<-as.character(indList$filterName)
+  indList$taxon<-as.character(indList$taxon)
+  indList$variety<-as.character(indList$variety)
+    indSample <-Sample
+    indSample$standardized_value <- as.double(indSample$standardized_value)
+    indSample <- indSample %>% drop_na(standardized_value)
+    indSampleSLA<-filter(indSample,trait_name == "SLA")
+    indSampleLNC<-filter(indSample,trait_name == "LNC per leaf dry mass")
+    if(length(indSampleSLA[[1]])>0 && length(indSampleLNC[[1]]>0)){
+      matchingInd<-intersect(indSampleLNC$id_occurence,indSampleSLA$id_occurence)
+      if(length(matchingInd)>0){
+    if(length(indSampleSLA[,1]) != length(indSampleLNC[,1])){
+      if(length(matchingInd)>0){
+      for(i in 1:length(matchingInd)){
+      indexSLA<- match(matchingInd[i],indSampleSLA$id_occurence)
+      indexLNC<- match(matchingInd[i],indSampleLNC$id_occurence)
+      indList<-indList %>% add_row(meanSLA = indSampleSLA[indexSLA,]$standardized_value, meanLNC = indSampleLNC[indexLNC,]$original_value, filterName = filterLegend, taxon = indSampleSLA[indexSLA,]$taxon, variety = indSampleSLA[indexSLA,]$subtaxa)
+      }}
+    } else {
+        for (i in 1:length(Sample[,1])){
+          indList<-indList %>% add_row(meanSLA = indSampleSLA[i,]$standardized_value, meanLNC = indSampleLNC[i,]$original_value, filterName = filterLegend, taxon = indSampleSLA[i,]$taxon, variety = indSampleSLA[i,]$subtaxa)
+        }
+    }
+      }}
+  indList$meanSLA<-log10(indList$meanSLA)
+  indList$meanLNC<-log10(indList$meanLNC)
+  ##
+  return(indList)
+  }
   
   normalize<-function(dataset){
   for(i in 1:length(dataset[,1])){
@@ -327,6 +365,39 @@ function(input,output,session){
       myReact$toPlot<-NULL  
     }
   })
+  ###-Info onMouseover
+  output$hover_info <- renderUI({
+    if(!is.null(myReact$toPlot)){
+    if(!is.na(myReact$toPlot[1,1] & myReact$toPlot[1,2])){
+    hover<-input$plot_hover
+    point <- nearPoints(myReact$toPlot, hover, threshold = 5, maxpoints = 1, addDist = TRUE)
+    if (nrow(point) == 0) return(NULL)
+    
+    # calculate point position INSIDE the image as percent of total dimensions
+    # from left (horizontal) and from top (vertical)
+    left_pct <- (hover$x - hover$domain$left) / (hover$domain$right - hover$domain$left)
+    top_pct <- (hover$domain$top - hover$y) / (hover$domain$top - hover$domain$bottom)
+    
+    # calculate distance from left and bottom side of the picture in pixels
+    left_px <- hover$range$left + left_pct * (hover$range$right - hover$range$left)
+    top_px <- hover$range$top + top_pct * (hover$range$bottom - hover$range$top)
+    
+    # create style property fot tooltip
+    # background color is set so tooltip is a bit transparent
+    # z-index is set so we are sure are tooltip will be on top
+    style <- paste0("position:absolute; z-index:100; background-color: rgba(245, 245, 245, 0.85); ",
+                    "left:", left_px + 2, "px; top:", top_px + 2, "px;")
+    
+    # actual tooltip created as wellPanel
+    wellPanel(
+      style = style,
+      p(HTML(paste0("<b> Specie: </b>", point$taxon), "<br/>",
+                    "<b> Variety: </b>", point$variety, "<br/>",))) 
+    }
+    }
+  })
+  
+  
   ########################################################################
   #########################-Trait variability-############################
   ########################################################################
@@ -413,25 +484,6 @@ function(input,output,session){
     }
   }  
     filterList<- paste(filterList, collapse = " and ")
-    return(filterList)
-  }
-  ###-Concatenate query-###
-  dbManagement2<- function(con){
-  filterList<-""
-  inputs<-NULL
-  inputList<-list(input$dlTaxon,input$scale,input$dlTraits,input$dlFunctional_group,input$dlSampling_type)
-  inputNameList<-list("taxon","traitmeas_scale","trait_name","functio_group","sampling_type")
-  for(i in 1:length(inputList)){
-    if(!is.null(inputList[i][[1]]) &&  !inputList[i]==""){
-      inputList[i][[1]]<-sapply(strsplit(inputList[i][[1]],","), function(x) toString(sQuote(x,F)))
-      inputs<-paste(inputList[i][[1]],collapse=",")
-      filterList<-c(filterList,paste(" info ->>'",inputNameList[i],"' in (",inputs,")",sep=""))
-      #sql <- paste("info ->>'",inputNameList[i],"' in (?input)",sep="")
-      #query<-sqlInterpolate(con,sql,input=inputs)
-    }
-  }
-    filterList<- paste(filterList, collapse = " and ")
-    filterList<-substr(filterList,5,nchar(filterList))
     return(filterList)
   }
   

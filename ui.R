@@ -34,7 +34,7 @@ dashboardPage(
                                         pickerInput("Functional_group",'Functional group',multiple=TRUE,choices=NULL,options = list(`actions-box` = TRUE)),
                                         pickerInput("sampling_type",'Sampling type',multiple=TRUE,choices=NULL,options = list(`actions-box` = TRUE)),
                                         actionButton("visualize","Visualize"),actionButton("reset","Reset"),p(),span(verbatimTextOutput('resText'),style="text-align:center;")),
-                                 column(width = 6,plotOutput("SLAvsLNC")))),
+                                 column(width = 6,plotOutput("SLAvsLNC",hover = hoverOpts("plot_hover")),uiOutput("hover_info")))),
               fluidRow(column(width = 6,wellPanel(span("Select parameters of interest then click the visualize button to display the matching data on the plot.",tags$br(),
                                                       "Several conditions can be added on the same plot like layers.",
                                                       "Previous plotting can be erased by hitting the reset button.",style="font-size:16px;")))),
