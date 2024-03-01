@@ -39,8 +39,8 @@ function(input,output,session){
   trait_query<-"SELECT DISTINCT info->>'trait_name' as trait_name FROM croptrait  ORDER BY info->>'trait_name';"
   traits<-dbGetQuery(con, trait_query)
   updatePickerInput(session, "dlTraits", choices = traits)
-  updateSelectInput(session, "varTraits", choices = traits)
-  updatePickerInput(session, "bbtr_Traits", choices = traits)
+  updateSelectInput(session, "varTraits", choices = )
+  updatePickerInput(session, "bbtr_Traits", choices = c("",traits))
   
   scale_query<-"SELECT DISTINCT info->>'observationLevels' as observationLevels FROM croptrait  ORDER BY info->>'observationLevels';"
   scaleRes<-dbGetQuery(con, scale_query)
@@ -61,19 +61,22 @@ function(input,output,session){
   #########################################
   #------Browse by Traits-----#
   observeEvent(input$bbtr_Traits,{
-    if(length(input$bbtr_Traits)>0){
+    if(length(input$bbtr_Traits)>0 && input$bbtr_Traits!=""){
         con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
-        bbtr_taxonQuery<-paste("SELECT DISTINCT info->>'genus' as genus, info->>'species' as species FROM croptrait where info->>'trait_name' in ('",
-                               paste(input$bbtr_Traits, collapse = "' ,'"),"') ORDER BY info->>'genus';",sep="")
+        bbtr_taxonQuery<-paste("SELECT info->>'genus' as genus, info->>'species' as species, count(*) FROM croptrait where info->>'trait_name' in ('",
+                               paste(input$bbtr_Traits, collapse = "' ,'"),"') GROUP BY info->>'genus', info->>'species' ORDER BY info->>'genus';",sep="")
         bbtr_taxonList<-dbGetQuery(con, bbtr_taxonQuery)
         dbDisconnect(con)
         bbtr_dynamicList<-data.frame(matrix(nrow=0,ncol=0))
         for(i in 1:length(bbtr_taxonList$genus)){
           bbtr_dynamicList<-rbind(bbtr_dynamicList,paste(bbtr_taxonList[i,1],bbtr_taxonList[i,2],sep=" "))
         }
-        updateSelectizeInput(session, "bbtr_Taxon", choices = c("",bbtr_dynamicList[,1]),server = T)
-        output$bbtr_table<-renderTable(bbtr_dynamicList[,1],striped = T,hover = T,bordered = T)
-    } else{updateSelectizeInput(session, "bbtr_Taxon", choices = "")}
+        bbtr_taxonList$count<-as.integer(bbtr_taxonList$count)
+        output$bbtr_table<-renderTable(bbtr_taxonList,striped = T,hover = T,bordered = T)
+        output$bbtr_title<-renderText(HTML(paste0("Available data for <b>",input$bbtr_Traits,"</b>")))
+    } else{output$bbtr_table<-renderTable(NULL)
+          output$bbtr_title<-renderText(NULL)
+}
   },ignoreNULL = FALSE)
   
   #------Browse by Taxon-----#
@@ -94,18 +97,18 @@ function(input,output,session){
   },ignoreNULL = FALSE)
     
     observeEvent(input$bbta_Taxon,{
-    if(length(input$bbta_functio_group)>0){
+    if(length(input$bbta_Taxon)>0 && input$bbta_Taxon!=""){
         selectedTaxon<-NameSpliter(input$bbta_Taxon)
         con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
-        #bbta_traitQuery<-paste("SELECT DISTINCT info->>'trait_name' as trait_name FROM croptrait where info->>'species' in ('",
-        #                       paste(selectedTaxon$allSpecie, collapse = "' ,'"),"')  ORDER BY info->>'trait_name';",sep="")
         bbta_traitQuery<-paste("SELECT info->>'trait_name' as trait_name, count(*) FROM croptrait where info->>'species' in ('",
                                paste(selectedTaxon$allSpecie, collapse = "' ,'"),"')  group by info ->> 'trait_name' ORDER BY info->>'trait_name';",sep="")        
         bbta_traitList<-dbGetQuery(con, bbta_traitQuery)
         dbDisconnect(con)
-        updateSelectizeInput(session, "bbta_Traits", choices = c("",bbta_traitList),server = T)
+        bbta_traitList$count<-as.integer(bbta_traitList$count)
+        output$bbta_title<-renderText(HTML(paste0("Available data for <b>",input$bbta_Taxon,"</b>")))
         output$bbta_table<-renderTable(bbta_traitList,striped = T,hover = T,bordered = T)
-    } else{updateSelectizeInput(session, "bbta_Traits", choices = "")}
+    } else{output$bbta_table<-renderTable(NULL)
+          output$bbta_title<-renderText(NULL)}
   },ignoreNULL = FALSE)
     
   #################################################    

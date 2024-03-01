@@ -24,11 +24,11 @@ dashboardPage(
               tags$style(HTML("
                         #bbtr_table{
                         overflow-y:auto;
-                        height:550px;
+                        height:650px;
                         }
                         #bbta_table{
                         overflow-y:auto;
-                        height:500px;
+                        height:600px;
                         }
                         "))),
     useShinyjs(),
@@ -38,12 +38,14 @@ dashboardPage(
               includeMarkdown("www/cropTraitHomepage.md")
               ),
       tabItem(tabName = "browse",h2("Browse database "),
-              fluidRow(column(width = 6,wellPanel(h3("Browse by Traits "),pickerInput("bbtr_Traits",'Traits',multiple=TRUE,choices=NULL,options = list(`actions-box` = TRUE)),
-                                        selectizeInput("bbtr_Taxon",'Taxon',multiple=FALSE,choices=NULL,options = list(maxOptions = 2500))),tableOutput('bbtr_table')),
-                                 column(width = 6,wellPanel(h3("Browse by Taxon "),pickerInput("bbta_functio_group",'Functional group',multiple=TRUE,choices=NULL,options = list(`actions-box` = TRUE)),
+              fluidRow(column(width = 6,wellPanel(h3("Browse by Traits "),HTML("<p style=font-size:15px;>Display available data per taxon for a chosen trait.</p>"),
+                                        pickerInput("bbtr_Traits",'Traits',multiple=FALSE,choices=NULL,options = list(`actions-box` = TRUE))),
+                                        h3(uiOutput('bbtr_title')),tableOutput('bbtr_table')),
+                                 column(width = 6,wellPanel(h3("Browse by Taxon "),HTML("<p style=font-size:15px;>Display available data per trait for a chosen taxon.</p>\n
+                                                                                        <p style=font-size:15px;>Choose one or multiple functional group then one taxon to display the corresponding available traits data</p>"),
+                                        pickerInput("bbta_functio_group",'Functional group',multiple=TRUE,choices=NULL,options = list(`actions-box` = TRUE)),
                                         selectizeInput("bbta_Taxon",'Taxon',multiple=FALSE,choices=NULL,options = list(maxOptions = 2500)),
-                                        selectizeInput("bbta_Traits",'Traits',multiple=FALSE,choices=NULL,options = list(maxOptions = 2500)),
-                                        ),tableOutput('bbta_table')))),
+                                        ),h3(uiOutput('bbta_title')),tableOutput('bbta_table')))),
       tabItem(tabName = "visualization",h2("Relationship between SLA and LNC "),
               ##################-VISUALIZATION TAB-###################
               ###-SLA VS LNC-###
