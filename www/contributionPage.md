@@ -1,4 +1,4 @@
-# Contribute to CropTrait
+# Contribute to CropTraits
 
 <br /><font size ="5"> Click [here] to contribute to the database</font>
 

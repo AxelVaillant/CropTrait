@@ -39,7 +39,7 @@ function(input,output,session){
   trait_query<-"SELECT DISTINCT info->>'trait_name' as trait_name FROM croptrait  ORDER BY info->>'trait_name';"
   traits<-dbGetQuery(con, trait_query)
   updatePickerInput(session, "dlTraits", choices = traits)
-  updateSelectInput(session, "varTraits", choices = )
+  updateSelectInput(session, "varTraits", choices = traits)
   updatePickerInput(session, "bbtr_Traits", choices = c("",traits))
   
   scale_query<-"SELECT DISTINCT info->>'observationLevels' as observationLevels FROM croptrait  ORDER BY info->>'observationLevels';"
@@ -332,7 +332,7 @@ function(input,output,session){
     genSample <- filter (Sample,gen_name==genotypes[[1]][i])
     genSample$standardized_value <- as.double(genSample$standardized_value)
     genSample <- genSample %>% drop_na(standardized_value)
-    genSampleSLA<-filter(genSample,trait_name == "SLA")
+    genSampleSLA<-filter(genSample,trait_name == "Specific leaf area")
     genSampleLNC<-filter(genSample,trait_name == "LNC per leaf dry mass")
     if(length(genSampleSLA[[1]])>0 && length(genSampleLNC[[1]]>0)){
       #genSampleSLA<-normalize(genSampleSLA)
@@ -357,7 +357,7 @@ function(input,output,session){
     indSample <-Sample
     indSample$standardized_value <- as.double(indSample$standardized_value)
     indSample <- indSample %>% drop_na(standardized_value)
-    indSampleSLA<-filter(indSample,trait_name == "SLA")
+    indSampleSLA<-filter(indSample,trait_name == "Specific leaf area")
     indSampleLNC<-filter(indSample,trait_name == "LNC per leaf dry mass")
     if(length(indSampleSLA[[1]])>0 && length(indSampleLNC[[1]]>0)){
       matchingInd<-intersect(indSampleLNC$id_occurence,indSampleSLA$id_occurence)
