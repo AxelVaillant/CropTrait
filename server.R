@@ -1,6 +1,6 @@
 plan(multisession)
 function(input,output,session){
-  
+  options(useFancyQuotes = FALSE)
   #-------Get credentials----------------------#
   credentials<-read.table(file = "credentials.csv",header = TRUE,sep = "\t")
   dbHost<-credentials$dbHost
@@ -16,42 +16,57 @@ function(input,output,session){
   ################-DATABASE MANAGEMENT-##################
   observe({
     tryCatch({
-        AllDataQuery <- paste(readLines("Query.txt"), collapse="\n")
-  #con <- dbConnect(RPostgres::Postgres(), dbname= "CropTrait", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
-  con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
-
+  con <- dbConnect(RPostgres::Postgres(), dbname= "CropTraits", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
+  #con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
+  
+  ###-Database recap-###
+  recap_trait<-'SELECT count("Name") from "Trait";'
+  recap_obs<-'SELECT COUNT(*) from "Observation";'
+  recap_geno<-'SELECT count("Gen_name") from "Taxonomy_extended";'
+  recap_taxons<-'SELECT count("Taxon_name") from "Taxonomy_essentials";'
+    
+  res_traits<-dbGetQuery(con, recap_trait)
+  res_obs<-dbGetQuery(con, recap_obs)
+  res_geno<-dbGetQuery(con, recap_geno)
+  res_taxons<-dbGetQuery(con, recap_taxons)
+  fieldName<-data.frame(c("Traits","Observations","Uniques genotypes","Known taxons"))
+  colnames(fieldName)<-"Content"
+  fieldRes<-data.frame(c(res_traits$count,res_obs$count,res_geno$count,res_taxons$count))
+  colnames(fieldRes)<-"Total"
+  recapList<-cbind(fieldName,fieldRes)
+  recapList$Total<-as.integer(recapList$Total)
+  output$recapTable<-renderTable(recapList,width=450,height=400,striped = T,hover = T,bordered = T)
+  
   ###-Selectize input-###
   updateSelectizeInput(session, "taxons", choices = taxonTableSpNb[,1],server = T)
   updateSelectizeInput(session, "dlTaxon", choices = taxonTableSpNb[,1],server = T)
 
   #####-Picker input-#####
-  functio_group_query<-"SELECT DISTINCT info->>'functio_group' as Fonctional_group FROM croptrait  ORDER BY info->>'functio_group';"
+  functio_group_query<-'SELECT DISTINCT "Functio_group" as Functional_group FROM "Taxonomy_essentials"  ORDER BY "Functio_group";'
   functio_group<-dbGetQuery(con, functio_group_query)
   updatePickerInput(session, "Functional_group", choices = functio_group)
   updatePickerInput(session, "dlFunctional_group", choices = functio_group)
 
-  sampling_type_query<-"SELECT DISTINCT info->>'sampling_type' as Sampling_type FROM croptrait  ORDER BY info->>'sampling_type';"
+  sampling_type_query<-'SELECT DISTINCT "Type" as Sampling_type FROM "Sampling_site"  ORDER BY "Type";'
   sampling_type<-dbGetQuery(con, sampling_type_query)
   updatePickerInput(session, "sampling_type", choices = sampling_type)
   updatePickerInput(session, "dlSampling_type", choices = sampling_type)
   
 
-  trait_query<-"SELECT DISTINCT info->>'trait_name' as trait_name FROM croptrait  ORDER BY info->>'trait_name';"
+  trait_query<-'SELECT DISTINCT "Name" as trait_name FROM "Trait"  ORDER BY "Name";'
   traits<-dbGetQuery(con, trait_query)
   updatePickerInput(session, "dlTraits", choices = traits)
   updateSelectInput(session, "varTraits", choices = traits)
   updatePickerInput(session, "bbtr_Traits", choices = c("",traits))
   
-  scale_query<-"SELECT DISTINCT info->>'observationLevels' as observationLevels FROM croptrait  ORDER BY info->>'observationLevels';"
+  scale_query<-'SELECT DISTINCT "Observation_levels" as observationLevels FROM "Observation"  ORDER BY "Observation_levels";'
   scaleRes<-dbGetQuery(con, scale_query)
   updatePickerInput(session, "dlScale", choices = scaleRes)
   
   ##-Browse database fields-##
-  bbta_functio_group_query<-"SELECT DISTINCT info->>'functio_group' as family FROM croptrait  ORDER BY info->>'functio_group';"
+  bbta_functio_group_query<-'SELECT DISTINCT "Functio_group" as family FROM "Taxonomy_essentials"  ORDER BY "Functio_group";'
   bbta_functio_group<-dbGetQuery(con, bbta_functio_group_query)
   updatePickerInput(session, "bbta_functio_group", choices = bbta_functio_group)
-  
-  #resAll <<- dbGetQuery(conn = con,statement = AllDataQuery)
   
   dbDisconnect(con)
     })
@@ -62,9 +77,10 @@ function(input,output,session){
   #------Browse by Traits-----#
   observeEvent(input$bbtr_Traits,{
     if(length(input$bbtr_Traits)>0 && input$bbtr_Traits!=""){
-        con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
-        bbtr_taxonQuery<-paste("SELECT info->>'genus' as genus, info->>'species' as species, count(*) FROM croptrait where info->>'trait_name' in ('",
-                               paste(input$bbtr_Traits, collapse = "' ,'"),"') GROUP BY info->>'genus', info->>'species' ORDER BY info->>'genus';",sep="")
+        #con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
+        con <- dbConnect(RPostgres::Postgres(), dbname= "CropTraits", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
+        bbtr_taxonQuery<-paste('SELECT "Taxon_name", count(*) FROM "Observation" where "Trait" in (',sQuote(paste(input$bbtr_Traits, collapse = "' ,'")),')
+        GROUP BY "Taxon_name" ORDER BY "Taxon_name";',sep="")
         bbtr_taxonList<-dbGetQuery(con, bbtr_taxonQuery)
         dbDisconnect(con)
         bbtr_dynamicList<-data.frame(matrix(nrow=0,ncol=0))
@@ -82,26 +98,23 @@ function(input,output,session){
   #------Browse by Taxon-----#
     observeEvent(input$bbta_functio_group,{
     if(length(input$bbta_functio_group)>0){
-        con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
-        bbta_taxonQuery<-paste("SELECT DISTINCT info->>'genus' as genus, info->>'species' as species FROM croptrait where info->>'functio_group' in ('",
-                               paste(input$bbta_functio_group, collapse = "' ,'"),"') ORDER BY info->>'genus';",sep="")
+        #con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
+        con <- dbConnect(RPostgres::Postgres(), dbname= "CropTraits", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
+        bbta_taxonQuery<-paste('SELECT DISTINCT T1."Taxon_name" as ObsTax FROM "Observation" as T1 INNER JOIN "Taxonomy_essentials" as T2 on 
+                               T1."Taxon_name" = T2."Taxon_name" AND T2."Functio_group" in (',sQuote(paste(input$bbta_functio_group, collapse = "' ,'")),
+                               ') ORDER BY T1."Taxon_name";',sep="")
         bbta_taxonList<-dbGetQuery(con, bbta_taxonQuery)
         dbDisconnect(con)
-        test<<-bbta_taxonList[,2]
-        bbta_dynamicList<-data.frame(matrix(nrow=0,ncol=0))
-        for(i in 1:length(bbta_taxonList$genus)){
-          bbta_dynamicList<-rbind(bbta_dynamicList,paste(bbta_taxonList[i,1],bbta_taxonList[i,2],sep=" "))
-        }
-        updateSelectizeInput(session, "bbta_Taxon", choices = c("",bbta_dynamicList[,1]),server = T)
+        updateSelectizeInput(session, "bbta_Taxon", choices = c("",bbta_taxonList[,1]),server = T)
     } else{updateSelectizeInput(session, "bbta_Taxon", choices = "")}
   },ignoreNULL = FALSE)
     
     observeEvent(input$bbta_Taxon,{
     if(length(input$bbta_Taxon)>0 && input$bbta_Taxon!=""){
-        selectedTaxon<-NameSpliter(input$bbta_Taxon)
-        con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
-        bbta_traitQuery<-paste("SELECT info->>'trait_name' as trait_name, count(*) FROM croptrait where info->>'species' in ('",
-                               paste(selectedTaxon$allSpecie, collapse = "' ,'"),"')  group by info ->> 'trait_name' ORDER BY info->>'trait_name';",sep="")        
+        #con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
+        con <- dbConnect(RPostgres::Postgres(), dbname= "CropTraits", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
+        bbta_traitQuery<-paste('SELECT  "Trait", count(*) FROM "Observation" where "Taxon_name" in (',sQuote(paste(input$bbta_Taxon, collapse = "' ,'")),
+                               ') GROUP BY "Trait" order by "Trait";',sep="")         
         bbta_traitList<-dbGetQuery(con, bbta_traitQuery)
         dbDisconnect(con)
         bbta_traitList$count<-as.integer(bbta_traitList$count)
@@ -115,8 +128,9 @@ function(input,output,session){
   ####-dynamic taxon list on trait availability-###
   observeEvent(input$varTraits,{
     if(input$varTraits!=""){
-        con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
-        taxonQuery<-paste("SELECT DISTINCT info->>'genus' as genus, info->>'species' as species FROM croptrait where info->>'trait_name'='",input$varTraits,"';",sep="")
+        #con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
+        con <- dbConnect(RPostgres::Postgres(), dbname= "CropTraits", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
+        taxonQuery<-paste('SELECT DISTINCT "Taxon_name" FROM "Observation" WHERE "Trait"=',sQuote(input$varTraits),';',sep="")
         taxonList<-dbGetQuery(con, taxonQuery)
         dynamicList<-data.frame(matrix(nrow=0,ncol=0))
         for(i in 1:length(taxonList$genus)){
@@ -519,21 +533,21 @@ function(input,output,session){
   allSpecie<-NULL
   inputs<-NULL
   inputList<-list(input$dlTaxon,input$dlScale,input$dlTraits,input$dlFunctional_group,input$dlSampling_type)
-  inputNameList<-list("taxon","observationLevels","trait_name","functio_group","sampling_type")
+  inputNameList<-list("Obs.Taxon_name","Observation_levels","Trait","Functio_group","Type")
   for(i in 1:length(inputList)){
     if(!is.null(inputList[i][[1]]) &&  !inputList[i]==""){
       if(i==1){
-        splited<-NameSpliter(input$dlTaxon)
-        for(iterator in 1:length(splited$allGenus)){
-          splited$allGenus[iterator]<-sQuote(splited$allGenus[iterator],F)
-          splited$allSpecie[iterator]<-sQuote(splited$allSpecie[iterator],F)
-        }
-        filterList<-c(filterList,paste(" info ->>'genus' in (",paste(splited$allGenus,collapse=","),")",sep=""))
-        filterList<-c(filterList,paste(" info ->>'species' in (",paste(splited$allSpecie,collapse=","),")",sep=""))
+      for(j in 1:length(inputList[i][[1]])){
+        split=strsplit(inputList[i][[1]][j],"-")
+        inputList[i][[1]][j]<-split[[1]][1]
+      }  
+        inputList[i][[1]]<-sapply(strsplit(inputList[i][[1]],","), function(x) toString(sQuote(x,F)))
+        inputs<-paste(inputList[i][[1]],collapse=",")
+        filterList<-c(filterList,paste('Obs."Taxon_name" in (',inputs,')',sep=""))
       } else {
-      inputList[i][[1]]<-sapply(strsplit(inputList[i][[1]],","), function(x) toString(sQuote(x,F)))
-      inputs<-paste(inputList[i][[1]],collapse=",")
-      filterList<-c(filterList,paste(" info ->>'",inputNameList[i],"' in (",inputs,")",sep=""))
+        inputList[i][[1]]<-sapply(strsplit(inputList[i][[1]],","), function(x) toString(sQuote(x,F)))
+        inputs<-paste(inputList[i][[1]],collapse=",")
+        filterList<-c(filterList,paste('"',inputNameList[i],'" in (',inputs,')',sep=""))
       }
     }
   }  
@@ -563,25 +577,25 @@ function(input,output,session){
     shinyjs::hide("queryDl")
     withProgress(message="Browsing database",detail = "Please wait", value = 0,{
       incProgress(1/5)
-    #con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
-    con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
+    con <- dbConnect(RPostgres::Postgres(), dbname= "CropTraits", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
+    #con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
     filterList<-dbManagement(con)
-    AllDataQuery <- paste(readLines("Query.txt"), collapse=" ")
+    AllDataQuery <- paste(readLines("Query2.txt"), collapse=" ")
     if(!filterList==""){
       ifelse(isTRUE(adminMode$isAdmin),
-             filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"WHERE",filterList," ORDER BY info->>'id_bdd';",sep =" "),
-             filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"WHERE info->>'data_access' in ('Public','Public (notify the PIs)') and",filterList," ORDER BY info->>'id_bdd';",sep =" "))
+             filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"WHERE",filterList,sep =" "),
+             filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),'WHERE Geninfo."Data_access" in (',sQuote("Public"),",",sQuote("Public (notify the PIs)"),');',sep =" "))
       print(filteredQuery)
     } else {
       ifelse(isTRUE(adminMode$isAdmin),
-             filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"ORDER BY info->>'id_bdd';",sep =" "),
-             filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"WHERE info->>'data_access' in ('Public','Public (notify the PIs)') ORDER BY info->>'id_bdd';",sep =" "))
+             filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),sep =" "),
+             filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),'WHERE Geninfo."Data_access" in (',sQuote("Public"),",",sQuote("Public (notify the PIs)"),');',sep =" "))
       }
     incProgress(1/2)
     res <<- dbGetQuery(conn = con,statement = filteredQuery)
     dbDisconnect(con)
     
-    userData<<- res %>% filter(data_access == "Public (notify the PIs)")
+    userData<<- res %>% filter(Data_access == "Public (notify the PIs)")
     if(length(userData[,1])>0 & !isTRUE(adminMode$isAdmin)){
       shinyjs::show("userInfos")
     } else {
@@ -617,7 +631,7 @@ function(input,output,session){
   adminMode$message<-""
   adminMode$isAdmin<-FALSE
   observeEvent(input$submitPswd,{
-    if(input$adminPswd == "croptraitpass2023"){
+    if(input$adminPswd == credentials$adminpass){
       adminMode$message<- "Admin mode"
       adminMode$isAdmin<-TRUE
       shinyjs::hide("admin")
