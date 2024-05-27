@@ -22,7 +22,7 @@ SELECT contact_s."Name" as sender_name,contact_s."Email" as sender_email,
 	Condexp."Fertilization_frequency",Condexp."Tillage_practice",Condexp."Pesticide_condition",Condexp."Culture_type",
 	Treatment."Treatment_type",Treatment."Treatment_quantity",Treatment."Treatment_quantity_unit",Treatment."Treatment_description",
 	Obs."Observation_levels",Trait."Name" as Trait,Trait."TOP_trait_id",Obs."Plant_identification",Obs."Bloc_identification",Obs."Original_value",
-	Obs."Original_unit",Obs."Standardized_value",Obs."Standardized_unit",Obs."Observation_levels",
+	Obs."Original_unit",Obs."Standardized_value",Obs."Standardized_unit",
 	Meas."Method",Meas."Stage" as plant_stage,Meas."Organ",Meas."Leaf_age",Meas."Plant_age",Meas."Replicate_number",Meas."Std_value",
 	Dataset."Name" as Dataset,Hu."AnimalFood",Hu."EnvironmentalUses",Hu."Fuels",Hu."GeneSources",Hu."HumanFood",Hu."InverterbrateFood",
 	Hu."Materials",Hu."Medicines",Hu."Poisons",Hu."SocialUses",Hu."Total_uses"

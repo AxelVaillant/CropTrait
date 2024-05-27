@@ -9,9 +9,8 @@ function(input,output,session){
   dbPassword<-credentials$dbPassword
   
   ###
-  resAll <-read.table("DB.csv",header = T,sep=";", dec=".", fill=T)
   taxonTable <-read.table("taxon_Table.csv",header = F,sep=";", dec=".",quote='"', fill=FALSE)
-  taxonTableSpNb <-read.table("taxon_TableSpNb.csv",header = F,sep=";", dec=".",quote='"', fill=FALSE)
+
   #######################################################
   ################-DATABASE MANAGEMENT-##################
   observe({
@@ -38,8 +37,15 @@ function(input,output,session){
   output$recapTable<-renderTable(recapList,width=450,height=400,striped = T,hover = T,bordered = T)
   
   ###-Selectize input-###
-  updateSelectizeInput(session, "taxons", choices = taxonTableSpNb[,1],server = T)
-  updateSelectizeInput(session, "dlTaxon", choices = taxonTableSpNb[,1],server = T)
+  TaxTabNb_query<-paste0('SELECT "Taxon_name", COUNT(*) from "Observation" group by "Taxon_name" order by "Taxon_name";')
+  resTaxTableNb<-dbGetQuery(con, TaxTabNb_query)
+  TaxTabNb<-data.frame()
+  for(i in 1:length(resTaxTableNb$Taxon_name)){
+    x<-paste0(resTaxTableNb$Taxon_name[i],"-",resTaxTableNb$count[i])
+    TaxTabNb<-rbind(TaxTabNb,x)
+  }
+  updateSelectizeInput(session, "taxons", choices = TaxTabNb[,1],server = T)
+  updateSelectizeInput(session, "dlTaxon", choices = TaxTabNb[,1],server = T)
 
   #####-Picker input-#####
   functio_group_query<-'SELECT DISTINCT "Functio_group" as Functional_group FROM "Taxonomy_essentials"  ORDER BY "Functio_group";'
@@ -130,13 +136,9 @@ function(input,output,session){
     if(input$varTraits!=""){
         #con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
         con <- dbConnect(RPostgres::Postgres(), dbname= "CropTraits", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
-        taxonQuery<-paste('SELECT DISTINCT "Taxon_name" FROM "Observation" WHERE "Trait"=',sQuote(input$varTraits),';',sep="")
+        taxonQuery<-paste('SELECT DISTINCT "Taxon_name" FROM "Observation" WHERE "Trait"=',sQuote(input$varTraits),' ORDER BY "Taxon_name";',sep="")
         taxonList<-dbGetQuery(con, taxonQuery)
-        dynamicList<-data.frame(matrix(nrow=0,ncol=0))
-        for(i in 1:length(taxonList$genus)){
-          dynamicList<-rbind(dynamicList,paste(taxonList[i,1],taxonList[i,2],sep=" "))
-        }
-        updateSelectizeInput(session, "varSpecies", choices = c("",dynamicList[,1]),server = T)
+        updateSelectizeInput(session, "varSpecies", choices = c("",taxonList$Taxon_name),server = T)
         dbDisconnect(con)
     }
   })
@@ -155,20 +157,6 @@ function(input,output,session){
 
     ###-Reactive data for plotting-###
     myReact <- reactiveValues()
-
-        ###-Asynchrone-###
- #  observeEvent(input$visualizeR,{
- #    future_promise({
- #      return((concatenateQuery()))
- #    }) %...>%(function(Sample){
- #      genList<-traitSplitByInd(Sample)
- #      myReact$toPlot<-rbind(myReact$toPlot,genList) 
- #      })%...!%(function(error){
- #      myReact$toPlot<-NULL
- #      warning("Plot Error")
- #    }) 
- #    })
-    
     
     ###-Add one condition to plot-###
     observeEvent(input$visualize,{
@@ -252,7 +240,8 @@ function(input,output,session){
   #############################################################
   concatenateQuery<-function(){
   visuInputList<-list(input$taxons,input$Functional_group,input$sampling_type)
-  visuInputNames<-c("taxon","functio_group","sampling_type")
+  visuInputNames<-c("Taxon_name","Functio_group","Type")
+  con <- dbConnect(RPostgres::Postgres(), dbname= "CropTraits", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")  
   ####-REMPLACER FOR LOOP PAR APPLY
   visuQuery<-NULL
   if(!is.null(c(visuInputList[[1]],visuInputList[[2]],visuInputList[[3]]))){
@@ -260,38 +249,50 @@ function(input,output,session){
     if(!is.null(visuInputList[i][[1]])){
       ###particular case for taxons
       if(i==1){
-        dfTaxons<-NameSpliter(input$taxons)
-        if(length(dfTaxons$allGenus)==1){
-        genusQuery<-paste(noquote("genus %in% "),sQuote(dfTaxons$allGenus,F),sep=" ")
-        specieQuery<-  paste(noquote("species %in% "),sQuote(dfTaxons$allSpecie,F),sep=" ")
+        dfTaxons<-NameSpliterRela(input$taxons)
+        if(length(dfTaxons$allTax)==1){
+          query <- paste0('Obs."Taxon_name" IN (',sQuote(dfTaxons$allTax),')')
         } else {
-        genusQuery<-paste(noquote("genus %in% "),list(dfTaxons$allGenus),sep=" ")
-        specieQuery<-  paste(noquote("species %in% "),list(dfTaxons$allSpecie),sep=" ")
+          query<-noquote(paste(noquote(list(dfTaxons$allTax)),collapse=","))
+          query<-str_replace_all(query,'"',"'")
+          query<-substr(query,2,nchar(query))
+          query <- paste0('Obs."Taxon_name" IN ',query)
         }
-        query<-paste(genusQuery,specieQuery,sep=" & ")
       } else {
         ###functio_group and sampling_type
          if(length(visuInputList[i][[1]])==1){
-           query <- paste(noquote(visuInputNames[i])," %in% ",sQuote(visuInputList[i],F),sep=" ")
+          query <- paste0(dQuote(visuInputNames[i]), " IN ('",visuInputList[i],"')")
          } else {
-           query <- paste(noquote(visuInputNames[i])," %in% ",visuInputList[i],sep=" ")
+           filter<-noquote(paste(visuInputList[i],collapse=","))
+           filter<-str_replace_all(filter,'"',"'")
+           filter<-substr(filter,2,nchar(filter))
+           query <- paste0(dQuote(visuInputNames[i]), " IN ",filter)
          }
       }
       if(is.null(visuQuery)){
         visuQuery<-query
       } else {
-        visuQuery<-paste(visuQuery,query,sep = " & ")
+        visuQuery<-paste(visuQuery,query,sep = " AND ")
       }
           }
   }
   if(!is.null(visuQuery)){
     ###filtering
-      Sample<- resAll %>% filter(!! rlang::parse_expr(visuQuery))
-      return(Sample)
+      query<-paste0('SELECT Obs."Taxon_name","Standardized_value","Standardized_unit","Original_value","Trait","Gen_name","Subtaxa","Plant_identification" from "Observation" as Obs 
+                    	JOIN "General_information" ON Obs."General_informationId" = "General_information"."General_informationId" 
+	                    JOIN "Sampling_site" ON "Sampling_site"."Sampling_siteId" = "General_information"."Sampling_site"
+	                    JOIN "Taxonomy_essentials" as Taxess ON Taxess."Taxon_name" = Obs."Taxon_name" 
+                      JOIN "Taxonomy_extended" as Taxext ON Taxext."ExtendedTaxId" = Obs."Taxonomy_extended" WHERE ',visuQuery)
+      res<-dbGetQuery(con, query)
+      return(res)
   } else { return(NULL)}
   } else {
-    return(resAll)
+    AllDataQuery <- paste(readLines("Query2.txt"), collapse=" ")
+    res<-dbGetQuery(con, AllDataQuery)
+    names(res)[names(res) == "trait"] <- "Trait"
+    return(res)
   }
+  dbDisconnect(con)
     }
   ##########################################################
   ##########-Print database matching results-###########
@@ -334,7 +335,7 @@ function(input,output,session){
   ##########-Filtering by genotypes-###########
   traitSplit<-function(Sample){
   filterLegend<-legendHandler()  
-  genotypes<-Sample %>% distinct(gen_name)
+  genotypes<-Sample %>% distinct(Gen_name)
   genotypes<-drop_na(genotypes)
   genList<-data.frame(matrix(ncol=5,nrow=0))
   colnames(genList) <-c('meanSLA','meanLNC','filterName',"taxon","variety")
@@ -343,14 +344,13 @@ function(input,output,session){
   genList$variety<-as.character(genList$variety)
   if(!is.na(genotypes[1,])){
   for (i in 1:length(genotypes[[1]])){
-    genSample <- filter (Sample,gen_name==genotypes[[1]][i])
-    genSample$standardized_value <- as.double(genSample$standardized_value)
-    genSample <- genSample %>% drop_na(standardized_value)
-    genSampleSLA<-filter(genSample,trait_name == "Specific leaf area")
-    genSampleLNC<-filter(genSample,trait_name == "LNC per leaf dry mass")
+    genSample <- filter (Sample,Gen_name==genotypes[[1]][i])
+    genSample$Standardized_value <- as.double(genSample$Standardized_value)
+    genSample <- genSample %>% drop_na(Standardized_value)
+    genSampleSLA<-filter(genSample,Trait == "Specific leaf area")
+    genSampleLNC<-filter(genSample,Trait == "LNC per leaf dry mass")
     if(length(genSampleSLA[[1]])>0 && length(genSampleLNC[[1]]>0)){
-      #genSampleSLA<-normalize(genSampleSLA)
-      genList<-genList %>% add_row(meanSLA = mean(genSampleSLA$standardized_value), meanLNC = mean(genSampleLNC$original_value), filterName = filterLegend,taxon = paste(genSample[1,]$genus,genSample[1,]$species,sep=" "), variety = genSample[1,]$subtaxa)
+      genList<-genList %>% add_row(meanSLA = mean(genSampleSLA$Standardized_value), meanLNC = mean(genSampleLNC$Original_value), filterName = filterLegend,taxon = genSample[1,]$Taxon_name, variety = genSample[1,]$Subtaxa)
     }
   }
   genList$meanSLA<-log10(genList$meanSLA)
@@ -369,23 +369,23 @@ function(input,output,session){
   indList$taxon<-as.character(indList$taxon)
   indList$variety<-as.character(indList$variety)
     indSample <-Sample
-    indSample$standardized_value <- as.double(indSample$standardized_value)
-    indSample <- indSample %>% drop_na(standardized_value)
-    indSampleSLA<-filter(indSample,trait_name == "Specific leaf area")
-    indSampleLNC<-filter(indSample,trait_name == "LNC per leaf dry mass")
+    indSample$Standardized_value <- as.double(indSample$Standardized_value)
+    indSample <- indSample %>% drop_na(Standardized_value)
+    indSampleSLA<-filter(indSample,Trait == "Specific leaf area")
+    indSampleLNC<-filter(indSample,Trait == "LNC per leaf dry mass")
     if(length(indSampleSLA[[1]])>0 && length(indSampleLNC[[1]]>0)){
-      matchingInd<-intersect(indSampleLNC$id_occurence,indSampleSLA$id_occurence)
+      matchingInd<-intersect(indSampleLNC$Plant_identification,indSampleSLA$Plant_identification)
       if(length(matchingInd)>0){
     if(length(indSampleSLA[,1]) != length(indSampleLNC[,1])){
       if(length(matchingInd)>0){
       for(i in 1:length(matchingInd)){
-      indexSLA<- match(matchingInd[i],indSampleSLA$id_occurence)
-      indexLNC<- match(matchingInd[i],indSampleLNC$id_occurence)
-      indList<-indList %>% add_row(meanSLA = indSampleSLA[indexSLA,]$standardized_value, meanLNC = indSampleLNC[indexLNC,]$original_value, filterName = filterLegend, taxon = paste(indSampleSLA[indexSLA,]$genus,indSampleSLA[indexSLA,]$species,sep=" "), variety = indSampleSLA[indexSLA,]$subtaxa)
+      indexSLA<- match(matchingInd[i],indSampleSLA$Plant_identification)
+      indexLNC<- match(matchingInd[i],indSampleLNC$Plant_identification)
+      indList<-indList %>% add_row(meanSLA = indSampleSLA[indexSLA,]$Standardized_value, meanLNC = indSampleLNC[indexLNC,]$Original_value, filterName = filterLegend, taxon = indSampleSLA[indexSLA,]$Taxon_name, variety = indSampleSLA[indexSLA,]$Subtaxa)
       }}
     } else {
         for (i in 1:length(Sample[,1])){
-          indList<-indList %>% add_row(meanSLA = indSampleSLA[i,]$standardized_value, meanLNC = indSampleLNC[i,]$original_value, filterName = filterLegend, taxon = paste(indSampleSLA[indexSLA,]$genus,indSampleSLA[indexSLA,]$species,sep=" "), variety = indSampleSLA[i,]$subtaxa)
+          indList<-indList %>% add_row(meanSLA = indSampleSLA[i,]$Standardized_value, meanLNC = indSampleLNC[i,]$Original_value, filterName = filterLegend, taxon = indSampleSLA[i,]$Taxon_name, variety = indSampleSLA[i,]$Subtaxa)
         }
     }
       }}
@@ -395,21 +395,10 @@ function(input,output,session){
   return(indList)
   }
   
-  normalize<-function(dataset){
-  for(i in 1:length(dataset[,1])){
-    if(dataset[i,]$original_unit == "cm2/g"){
-      dataset[i,]$original_value <- dataset[i,]$original_value/10
-    }
-    if(dataset[i,]$original_unit == "cm2/mg"){
-      dataset[i,]$original_value <- dataset[i,]$original_value*100
-    }
-  }
-  return(dataset)
-  }
-  
   legendHandler<-function(){
         filterUsed<-c(input$taxons,input$Functional_group,input$sampling_type)
         legendText<-NULL
+        if(length(filterUsed)>0){
         for(i in 1:length(filterUsed)){
           #-Cut Numbers-#
           splited<- strsplit(filterUsed[i],"-") 
@@ -420,7 +409,8 @@ function(input,output,session){
             legendText<-paste(legendText,fixedLegend,sep = " & ")
           }
         }
-        legendText <- gsub("&","& \n",legendText)
+        legendText <- gsub("&","& \n",legendText)          
+        }
         return(legendText)
   }
   ###-Reset Plot-###
@@ -469,20 +459,22 @@ function(input,output,session){
   #########################-Trait variability-############################
   ########################################################################
     output$traitVariability<-renderPlot({
-      trait <- resAll %>% filter(trait_name == input$varTraits)
+      con <- dbConnect(RPostgres::Postgres(), dbname= "CropTraits", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
+      query<-paste0('SELECT "Taxon_name","Standardized_value","Standardized_unit","Trait" from "Observation" WHERE "Trait"=',sQuote(input$varTraits))
+      trait<-dbGetQuery(con, query)
+      dbDisconnect(con)      
       if(length(trait[,1]) > 0){
       #-building dataframe for general traits values-#  
-      dfTrait <-data.frame(value = trait$standardized_value, unit = trait$standardized_unit, condition = trait$trait_name, dataset = "trait")
+      dfTrait <-data.frame(value = trait$Standardized_value, unit = trait$Standardized_unit, condition = trait$Trait, dataset = "trait")
       if(input$varTraits!="Leaf Thickness"){
        dfTrait<-removeOutliers(dfTrait) 
       }
       if(input$varSpecies!=""){
       #-filter specific taxon values for the trait-#  
-      splitedTaxon<-NameSpliter(input$varSpecies)
-      specie <- trait %>% filter(genus == splitedTaxon$allGenus & species == splitedTaxon$allSpecie)
+      specie <- trait %>% filter(Taxon_name==input$varSpecies)  
       if(length(specie[,1]) > 0){
       #-dataframes concatenation-#  
-      dfTax<-data.frame(value = specie$standardized_value, unit = specie$standardized_unit, condition = specie$taxon, dataset = "taxon")
+      dfTax<-data.frame(value = specie$Standardized_value, unit = specie$Standardized_unit, condition = specie$Taxon_name, dataset = "taxon")
       dfTrait<-rbind(dfTrait,dfTax)
       dfTrait$dataset <-factor(dfTrait$dataset,levels=c("trait","taxon"))
       #-Plotting parameters-#
@@ -503,10 +495,12 @@ function(input,output,session){
       })
   
   observeEvent(c(input$varSpecies,input$varTraits),{
-    trait <- resAll %>% filter(trait_name == input$varTraits)
+      con <- dbConnect(RPostgres::Postgres(), dbname= "CropTraits", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
+      query<-paste0('SELECT "Taxon_name","Standardized_value","Standardized_unit","Trait" from "Observation" WHERE "Trait"=',sQuote(input$varTraits))
+      trait<-dbGetQuery(con, query)
+      dbDisconnect(con)   
     if(input$varSpecies!=""){
-      splitedTaxon<-NameSpliter(input$varSpecies)
-      specie <- trait %>% filter(genus == splitedTaxon$allGenus & species == splitedTaxon$allSpecie)
+      specie <- trait %>% filter(Taxon_name==input$varSpecies)  
       taxonByTraitResult(specie)
     } else {
       taxonByTraitResult(trait)
@@ -558,20 +552,16 @@ function(input,output,session){
   #######################
   #-Taxon name spliter-#
   #######################
-    NameSpliter<-function(list){
-    allGenus<-NULL
-    allSpecie<-NULL
+    NameSpliterRela<-function(list){
+        allTax<-NULL
         for(j in 1:length(list)){
-        splited<- strsplit(list[j]," ")
-        genus<-splited[[1]][1]
-        splited2<-strsplit(splited[[1]][2],"-")
-        specie<-splited2[[1]][1]
-        allGenus<-c(allGenus,genus)
-        allSpecie<-c(allSpecie,specie)
+        splited<- strsplit(list[j],"-")
+        taxon<-splited[[1]][1]
+        allTax<-c(allTax,taxon)
         }
-        df<-data.frame(allGenus,allSpecie)
+        df<-data.frame(allTax)
         return(df)
-      }  
+      } 
   observeEvent(input$runQuery,{
     system(paste("mkdir ",session$token,sep = ""))
     shinyjs::hide("queryDl")

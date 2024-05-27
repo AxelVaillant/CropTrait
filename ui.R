@@ -40,7 +40,7 @@ dashboardPage(
               "<br>")),fluidRow(column(width = 6,img(src ="crop.png")),column(width = 6,div(withSpinner(tableOutput('recapTable')), style="font-size:175%"))), HTML(paste0("<br><br/>",
               "<p style=font-size:20px;> The CropTraits Database is composed of multi-sources with heterogeneous data including compilated data from litterature or other databases, data from our experiments and from our collaborators. The data are currently private and only available to our collaborators.</p>",
               "<b style=font-size:20px;>The database is configured for a minimal set of traits and is flexible enough to enter more traits, species, genotypes and ancillary data.</b> <p style=font-size:20px;>The database allows collecting data at different levels from general information about plant material description, including taxonomy and origin of material, to environnemental conditions and methods of measurements.</p>",
-              "<br>",img(src="tab.png"))
+              "<br>",img(src="CropTraitDiag24.png",height="1700",width="100%"))
               #includeMarkdown("www/cropTraitHomepage.md")
               )),
       tabItem(tabName = "browse",h2("Browse database "),
