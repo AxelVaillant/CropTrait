@@ -2,21 +2,20 @@ plan(multisession)
 function(input,output,session){
   options(useFancyQuotes = FALSE)
   #-------Get credentials----------------------#
-  credentials<-read.table(file = "credentials.csv",header = TRUE,sep = "\t")
+  credentials<-read.table(file = "CSV/credentials.csv",header = TRUE,sep = "\t")
   dbHost<-credentials$dbHost
   dbPort<-credentials$dbPort
   dbUser<-credentials$dbUser
   dbPassword<-credentials$dbPassword
   
   ###
-  taxonTable <-read.table("taxon_Table.csv",header = F,sep=";", dec=".",quote='"', fill=FALSE)
+  taxonTable <-read.table("CSV/taxon_Table.csv",header = F,sep=";", dec=".",quote='"', fill=FALSE)
 
   #######################################################
   ################-DATABASE MANAGEMENT-##################
   observe({
     tryCatch({
-  con <- dbConnect(RPostgres::Postgres(), dbname= "CropTraits", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
-  #con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
+  con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
   
   ###-Database recap-###
   recap_trait<-'SELECT count("Name") from "Trait";'
@@ -83,8 +82,7 @@ function(input,output,session){
   #------Browse by Traits-----#
   observeEvent(input$bbtr_Traits,{
     if(length(input$bbtr_Traits)>0 && input$bbtr_Traits!=""){
-        #con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
-        con <- dbConnect(RPostgres::Postgres(), dbname= "CropTraits", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
+        con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
         bbtr_taxonQuery<-paste('SELECT "Taxon_name", count(*) FROM "Observation" where "Trait" in (',sQuote(paste(input$bbtr_Traits, collapse = "' ,'")),')
         GROUP BY "Taxon_name" ORDER BY "Taxon_name";',sep="")
         bbtr_taxonList<-dbGetQuery(con, bbtr_taxonQuery)
@@ -104,8 +102,7 @@ function(input,output,session){
   #------Browse by Taxon-----#
     observeEvent(input$bbta_functio_group,{
     if(length(input$bbta_functio_group)>0){
-        #con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
-        con <- dbConnect(RPostgres::Postgres(), dbname= "CropTraits", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
+        con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
         bbta_taxonQuery<-paste('SELECT DISTINCT T1."Taxon_name" as ObsTax FROM "Observation" as T1 INNER JOIN "Taxonomy_essentials" as T2 on 
                                T1."Taxon_name" = T2."Taxon_name" AND T2."Functio_group" in (',sQuote(paste(input$bbta_functio_group, collapse = "' ,'")),
                                ') ORDER BY T1."Taxon_name";',sep="")
@@ -117,8 +114,7 @@ function(input,output,session){
     
     observeEvent(input$bbta_Taxon,{
     if(length(input$bbta_Taxon)>0 && input$bbta_Taxon!=""){
-        #con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
-        con <- dbConnect(RPostgres::Postgres(), dbname= "CropTraits", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
+        con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
         bbta_traitQuery<-paste('SELECT  "Trait", count(*) FROM "Observation" where "Taxon_name" in (',sQuote(paste(input$bbta_Taxon, collapse = "' ,'")),
                                ') GROUP BY "Trait" order by "Trait";',sep="")         
         bbta_traitList<-dbGetQuery(con, bbta_traitQuery)
@@ -134,8 +130,7 @@ function(input,output,session){
   ####-dynamic taxon list on trait availability-###
   observeEvent(input$varTraits,{
     if(input$varTraits!=""){
-        #con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
-        con <- dbConnect(RPostgres::Postgres(), dbname= "CropTraits", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
+        con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
         taxonQuery<-paste('SELECT DISTINCT "Taxon_name" FROM "Observation" WHERE "Trait"=',sQuote(input$varTraits),' ORDER BY "Taxon_name";',sep="")
         taxonList<-dbGetQuery(con, taxonQuery)
         updateSelectizeInput(session, "varSpecies", choices = c("",taxonList$Taxon_name),server = T)
@@ -147,7 +142,7 @@ function(input,output,session){
   ##############################################################################
   
   ####-GLOPNET-####
-    GLOPNET <-read.table("GLOPNETdata.csv",header = T,sep=";", dec=".",quote="", fill=FALSE)
+    GLOPNET <-read.table("CSV/GLOPNETdata.csv",header = T,sep=";", dec=".",quote="", fill=FALSE)
     str(GLOPNET)
     GLOPNET$LMA <- 10^(GLOPNET$log.LMA) #g/m2
     GLOPNET$LMA <- GLOPNET$LMA *10^-3 #kg/m2
@@ -241,9 +236,9 @@ function(input,output,session){
   concatenateQuery<-function(){
   visuInputList<-list(input$taxons,input$Functional_group,input$sampling_type)
   visuInputNames<-c("Taxon_name","Functio_group","Type")
-  con <- dbConnect(RPostgres::Postgres(), dbname= "CropTraits", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")  
-  ####-REMPLACER FOR LOOP PAR APPLY
+  con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
   visuQuery<-NULL
+  #-Check if at least one filtered is used
   if(!is.null(c(visuInputList[[1]],visuInputList[[2]],visuInputList[[3]]))){
   for(i in 1:length(visuInputList)){
     if(!is.null(visuInputList[i][[1]])){
@@ -286,8 +281,10 @@ function(input,output,session){
       res<-dbGetQuery(con, query)
       return(res)
   } else { return(NULL)}
+    #-Case when no filters have been selected so all data are selected
   } else {
-    AllDataQuery <- paste(readLines("Query2.txt"), collapse=" ")
+    AllDataQuery <- paste(readLines("CSV/Query2.txt"), collapse=" ")
+    #-Query to retrieve the whole database
     res<-dbGetQuery(con, AllDataQuery)
     names(res)[names(res) == "trait"] <- "Trait"
     return(res)
@@ -350,9 +347,11 @@ function(input,output,session){
     genSampleSLA<-filter(genSample,Trait == "Specific leaf area")
     genSampleLNC<-filter(genSample,Trait == "LNC per leaf dry mass")
     if(length(genSampleSLA[[1]])>0 && length(genSampleLNC[[1]]>0)){
+      #-We have both SLA and LNC value so we add a new row to the dataframe
       genList<-genList %>% add_row(meanSLA = mean(genSampleSLA$Standardized_value), meanLNC = mean(genSampleLNC$Original_value), filterName = filterLegend,taxon = genSample[1,]$Taxon_name, variety = genSample[1,]$Subtaxa)
     }
   }
+  #-Log scale for better visualization  
   genList$meanSLA<-log10(genList$meanSLA)
   genList$meanLNC<-log10(genList$meanLNC)
   }
@@ -374,9 +373,11 @@ function(input,output,session){
     indSampleSLA<-filter(indSample,Trait == "Specific leaf area")
     indSampleLNC<-filter(indSample,Trait == "LNC per leaf dry mass")
     if(length(indSampleSLA[[1]])>0 && length(indSampleLNC[[1]]>0)){
+      #-Find matching individual by Plant identification
       matchingInd<-intersect(indSampleLNC$Plant_identification,indSampleSLA$Plant_identification)
       if(length(matchingInd)>0){
     if(length(indSampleSLA[,1]) != length(indSampleLNC[,1])){
+      #-If size is different we have to find the matching individuals
       if(length(matchingInd)>0){
       for(i in 1:length(matchingInd)){
       indexSLA<- match(matchingInd[i],indSampleSLA$Plant_identification)
@@ -384,11 +385,13 @@ function(input,output,session){
       indList<-indList %>% add_row(meanSLA = indSampleSLA[indexSLA,]$Standardized_value, meanLNC = indSampleLNC[indexLNC,]$Original_value, filterName = filterLegend, taxon = indSampleSLA[indexSLA,]$Taxon_name, variety = indSampleSLA[indexSLA,]$Subtaxa)
       }}
     } else {
+      #If size is similar we can add all individuals
         for (i in 1:length(Sample[,1])){
           indList<-indList %>% add_row(meanSLA = indSampleSLA[i,]$Standardized_value, meanLNC = indSampleLNC[i,]$Original_value, filterName = filterLegend, taxon = indSampleSLA[i,]$Taxon_name, variety = indSampleSLA[i,]$Subtaxa)
         }
     }
       }}
+  #-Log scale for better visualization
   indList$meanSLA<-log10(indList$meanSLA)
   indList$meanLNC<-log10(indList$meanLNC)
   ##
@@ -459,13 +462,14 @@ function(input,output,session){
   #########################-Trait variability-############################
   ########################################################################
     output$traitVariability<-renderPlot({
-      con <- dbConnect(RPostgres::Postgres(), dbname= "CropTraits", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
+      con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
       query<-paste0('SELECT "Taxon_name","Standardized_value","Standardized_unit","Trait" from "Observation" WHERE "Trait"=',sQuote(input$varTraits))
       trait<-dbGetQuery(con, query)
       dbDisconnect(con)      
       if(length(trait[,1]) > 0){
       #-building dataframe for general traits values-#  
       dfTrait <-data.frame(value = trait$Standardized_value, unit = trait$Standardized_unit, condition = trait$Trait, dataset = "trait")
+      #-Special case
       if(input$varTraits!="Leaf Thickness"){
        dfTrait<-removeOutliers(dfTrait) 
       }
@@ -493,9 +497,9 @@ function(input,output,session){
       }
       }
       })
-  
+  #-Update trait variability results upon change of Specie/Traits selected-#
   observeEvent(c(input$varSpecies,input$varTraits),{
-      con <- dbConnect(RPostgres::Postgres(), dbname= "CropTraits", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
+      con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
       query<-paste0('SELECT "Taxon_name","Standardized_value","Standardized_unit","Trait" from "Observation" WHERE "Trait"=',sQuote(input$varTraits))
       trait<-dbGetQuery(con, query)
       dbDisconnect(con)   
@@ -520,6 +524,7 @@ function(input,output,session){
   ########################################################################
   #############################-Download Data-############################
   ########################################################################
+  #-----------------------#
   ###-Concatenate query-###
   dbManagement<- function(con){
   filterList<-NULL
@@ -530,6 +535,7 @@ function(input,output,session){
   inputNameList<-list("Obs.Taxon_name","Observation_levels","Trait","Functio_group","Type")
   for(i in 1:length(inputList)){
     if(!is.null(inputList[i][[1]]) &&  !inputList[i]==""){
+      #-Special case for Taxon name
       if(i==1){
       for(j in 1:length(inputList[i][[1]])){
         split=strsplit(inputList[i][[1]][j],"-")
@@ -539,6 +545,7 @@ function(input,output,session){
         inputs<-paste(inputList[i][[1]],collapse=",")
         filterList<-c(filterList,paste('Obs."Taxon_name" in (',inputs,')',sep=""))
       } else {
+        #-Case for the other filters
         inputList[i][[1]]<-sapply(strsplit(inputList[i][[1]],","), function(x) toString(sQuote(x,F)))
         inputs<-paste(inputList[i][[1]],collapse=",")
         filterList<-c(filterList,paste('"',inputNameList[i],'" in (',inputs,')',sep=""))
@@ -561,22 +568,26 @@ function(input,output,session){
         }
         df<-data.frame(allTax)
         return(df)
-      } 
+    } 
+  ##########################
+  #-Get data main process -#
+  ##########################
   observeEvent(input$runQuery,{
     system(paste("mkdir ",session$token,sep = ""))
     shinyjs::hide("queryDl")
     withProgress(message="Browsing database",detail = "Please wait", value = 0,{
       incProgress(1/5)
-    con <- dbConnect(RPostgres::Postgres(), dbname= "CropTraits", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
-    #con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
+    con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
     filterList<-dbManagement(con)
-    AllDataQuery <- paste(readLines("Query2.txt"), collapse=" ")
+    #-Load fixed SQL syntax
+    AllDataQuery <- paste(readLines("CSV/Query2.txt"), collapse=" ")
     if(!filterList==""){
       ifelse(isTRUE(adminMode$isAdmin),
              filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"WHERE",filterList,sep =" "),
              filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),'WHERE Geninfo."Data_access" in (',sQuote("Public"),",",sQuote("Public (notify the PIs)"),');',sep =" "))
       print(filteredQuery)
     } else {
+    #-Case with 0 filters -> get the whole database
       ifelse(isTRUE(adminMode$isAdmin),
              filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),sep =" "),
              filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),'WHERE Geninfo."Data_access" in (',sQuote("Public"),",",sQuote("Public (notify the PIs)"),');',sep =" "))
@@ -584,7 +595,7 @@ function(input,output,session){
     incProgress(1/2)
     res <<- dbGetQuery(conn = con,statement = filteredQuery)
     dbDisconnect(con)
-    
+    #-Check if we have to inform PI about their data downloaded
     userData<<- res %>% filter(Data_access == "Public (notify the PIs)")
     if(length(userData[,1])>0 & !isTRUE(adminMode$isAdmin)){
       shinyjs::show("userInfos")
@@ -596,16 +607,10 @@ function(input,output,session){
     })
   })
   
-  taxonHandler<-function(taxonInput){
-    nospace<-str_replace_all(taxonInput,", ",",")
-    splited<- strsplit(nospace,",")
-    editedTaxonInput<-sapply(splited, function(x) toString(sQuote(x,FALSE)))
-    return(editedTaxonInput)
-  }
-  
   #####################################################
   ###############-Admin access to data#################
   observeEvent(input$dataAccessMode,{
+    #-Process to toggle the password field
     if(input$dataAccessMode == "Admin"){
       shinyjs::show("admin")
     } else {
@@ -621,6 +626,7 @@ function(input,output,session){
   adminMode$message<-""
   adminMode$isAdmin<-FALSE
   observeEvent(input$submitPswd,{
+  #-Process to switch in/out admin mode
     if(input$adminPswd == credentials$adminpass){
       adminMode$message<- "Admin mode"
       adminMode$isAdmin<-TRUE
@@ -636,10 +642,11 @@ function(input,output,session){
   })
   #####################################################
   ###############-Check data access-###################
-  isInfosFilled<-observeEvent(input$submit,{
+  observeEvent(input$submit,{
     if(!input$userMail=="" && isValidEmail(input$userMail)){
       PiToContact<-userData %>% distinct(userData$pi_contact)
     for(i in 1:length(PiToContact[,1])){
+      #-Delete unwanted space characters
       nospace<- str_replace_all(PiToContact[i,1]," ","")
       splited<- strsplit(nospace,",")
       for(j in 1:length(splited[[1]])){
@@ -661,24 +668,28 @@ function(input,output,session){
   ############### DOWNLOAD HANDLING ###################
   uploadData <- function() {
     output$queryDl <- downloadHandler(
+      #-Give a name to the file
       filename = function() {
         paste("Dataset-", Sys.time(), ".csv", sep="")
       },
+      #-Give a location to the file
       content = function(file) {
         file.copy(paste(session$token,"/","queryRes.csv",sep=""),file)
       }
     )
   }
+      #-Handle download of the FieldDescription file located in the app
       output$fieldDesc <- downloadHandler(
       filename = "fieldsDescription.xlsx",
       content = function(file) {
         file.copy("fieldsDescription.xlsx",file)
       }
     )
+      #-Handle download of the taxon table file located in the app
       output$taxonTable <- downloadHandler(
-      filename = "taxon_Table.csv",
+      filename = "CSV/taxon_Table.csv",
       content = function(file) {
-        file.copy("taxon_Table.csv",file)
+        file.copy("CSV/taxon_Table.csv",file)
       }
     )
       
