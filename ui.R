@@ -16,6 +16,7 @@ dashboardPage(
       menuItem("Visualization", tabName = "visualization", icon=icon("chart-line")),
       menuItem("Get Data", tabName = "downloadTab", icon=icon("download")),
       menuItem("Contribution", tabName = "contribution", icon=icon("share")),
+      menuItem("Metadata", tabName = "metadata", icon=icon("magnifying-glass-chart")),
       menuItem("About", tabName = "about", icon=icon("question"))
     )
   ),
@@ -46,12 +47,12 @@ dashboardPage(
       tabItem(tabName = "browse",h2("Browse database "),
               fluidRow(column(width = 6,wellPanel(h3("Browse by Traits "),HTML("<p style=font-size:15px;>Display available data per taxon for a chosen trait.</p>"),
                                         pickerInput("bbtr_Traits",'Traits',multiple=FALSE,choices=NULL,options = list(`actions-box` = TRUE))),
-                                        h3(uiOutput('bbtr_title')),tableOutput('bbtr_table')),
+                                        h3(uiOutput('bbtr_title')),column(width=8,tableOutput('bbtr_table')),column(width=4,tableOutput('nbtr_table'))),
                                  column(width = 6,wellPanel(h3("Browse by Taxon "),HTML("<p style=font-size:15px;>Display available data per trait for a chosen taxon.</p>\n
                                                                                         <p style=font-size:15px;>Choose one or multiple functional group then one taxon to display the corresponding available traits data</p>"),
                                         pickerInput("bbta_functio_group",'Functional group',multiple=TRUE,choices=NULL,options = list(`actions-box` = TRUE)),
                                         selectizeInput("bbta_Taxon",'Taxon',multiple=FALSE,choices=NULL,options = list(maxOptions = 2500)),
-                                        ),h3(uiOutput('bbta_title')),tableOutput('bbta_table')))),
+                                        ),h3(uiOutput('bbta_title')),column(width=8,tableOutput('bbta_table')),column(width=4,tableOutput('nbta_table'))))),
       tabItem(tabName = "visualization",h2("Relationship between SLA and LNC "),
               ##################-VISUALIZATION TAB-###################
               ###-SLA VS LNC-###
@@ -68,8 +69,9 @@ dashboardPage(
                                                       "Several conditions can be added on the same plot like layers.",
                                                       "Previous plotting can be erased by hitting the reset button.",style="font-size:16px;")))),
               ###-TRAIT VARIABILITY-###
-              h2("Trait variability"),wellPanel(fluidRow(column(width = 6,selectInput("varTraits","Trait",choices = NULL),
-                                        selectizeInput("varSpecies",'Taxon',multiple=FALSE,choices=NULL,options = list(maxOptions = 2500)),
+              h2("Trait variability"),wellPanel(fluidRow(column(width = 6,span("This feature show the distribution of the database values for a specific trait.",tags$br(),
+                                        "It is also possible, for a selected trait, to compare the distribution of taxon-specific values against the entire database",style="font-size:16px;"),
+                                        selectInput("varTraits","Trait",choices = NULL),selectizeInput("varSpecies",'Taxon',multiple=FALSE,choices=NULL,options = list(maxOptions = 2500)),
                                         span(verbatimTextOutput('traitVarText'),style="text-align:center;")),
                                  column(width= 6,withSpinner(plotOutput("traitVariability")))))),
       tabItem(tabName = "downloadTab",h2("Get Data"),
@@ -95,6 +97,9 @@ dashboardPage(
               ##################-CONTRIBUTION TAB-###################
               includeMarkdown("www/contributionPage.md")
     ),
+    ##################-METADATA TAB-###################
+    tabItem(tabName = "metadata",
+             includeMarkdown("www/metadata.md")),    
     ##################-ABOUT TAB-###################
     tabItem(tabName = "about",
              includeMarkdown("www/about.md"))

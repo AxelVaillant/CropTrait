@@ -20,16 +20,14 @@ function(input,output,session){
   ###-Database recap-###
   recap_trait<-'SELECT count("Name") from "Trait";'
   recap_obs<-'SELECT COUNT(*) from "Observation";'
-  recap_geno<-'SELECT count("Gen_name") from "Taxonomy_extended";'
   recap_taxons<-'SELECT count("Taxon_name") from "Taxonomy_essentials";'
     
   res_traits<-dbGetQuery(con, recap_trait)
   res_obs<-dbGetQuery(con, recap_obs)
-  res_geno<-dbGetQuery(con, recap_geno)
   res_taxons<-dbGetQuery(con, recap_taxons)
-  fieldName<-data.frame(c("Traits","Observations","Uniques genotypes","Known taxons"))
+  fieldName<-data.frame(c("Traits","Observations","Known taxons"))
   colnames(fieldName)<-"Content"
-  fieldRes<-data.frame(c(res_traits$count,res_obs$count,res_geno$count,res_taxons$count))
+  fieldRes<-data.frame(c(res_traits$count,res_obs$count,res_taxons$count))
   colnames(fieldRes)<-"Total"
   recapList<-cbind(fieldName,fieldRes)
   recapList$Total<-as.integer(recapList$Total)
@@ -86,16 +84,28 @@ function(input,output,session){
         bbtr_taxonQuery<-paste('SELECT "Taxon_name", count(*) FROM "Observation" where "Trait" in (',sQuote(paste(input$bbtr_Traits, collapse = "' ,'")),')
         GROUP BY "Taxon_name" ORDER BY "Taxon_name";',sep="")
         bbtr_taxonList<-dbGetQuery(con, bbtr_taxonQuery)
+        #-Get number of taxon and obs for the selected trait
+        obsNb<-dbGetQuery(con, paste0('SELECT COUNT("Taxon_name") as Observation_number FROM "Observation" where "Trait" = ',sQuote(input$bbtr_Traits)))
+        taxonNb<-dbGetQuery(con,paste0('SELECT COUNT(DISTINCT "Taxon_name") as Taxon_number FROm "Observation" where "Trait" =',sQuote(input$bbtr_Traits)))
         dbDisconnect(con)
+        
         bbtr_dynamicList<-data.frame(matrix(nrow=0,ncol=0))
         for(i in 1:length(bbtr_taxonList$genus)){
           bbtr_dynamicList<-rbind(bbtr_dynamicList,paste(bbtr_taxonList[i,1],bbtr_taxonList[i,2],sep=" "))
         }
+        #-Merge nb of taxon and nb of obs
+        nb_table<-cbind(taxonNb,obsNb)
+        nb_table$taxon_number<-as.integer(nb_table$taxon_number)
+        nb_table$observation_number<-as.integer(nb_table$observation_number)
+        colnames(nb_table)<-c("Taxons","Observations")
         bbtr_taxonList$count<-as.integer(bbtr_taxonList$count)
         output$bbtr_table<-renderTable(bbtr_taxonList,striped = T,hover = T,bordered = T)
         output$bbtr_title<-renderText(HTML(paste0("Available data for <b>",input$bbtr_Traits,"</b>")))
+        output$nbtr_table<-renderTable(nb_table,striped = T,hover = T,bordered = T)
+        
     } else{output$bbtr_table<-renderTable(NULL)
           output$bbtr_title<-renderText(NULL)
+          output$nbtr_table<-renderTable(NULL)
 }
   },ignoreNULL = FALSE)
   
@@ -118,12 +128,23 @@ function(input,output,session){
         bbta_traitQuery<-paste('SELECT  "Trait", count(*) FROM "Observation" where "Taxon_name" in (',sQuote(paste(input$bbta_Taxon, collapse = "' ,'")),
                                ') GROUP BY "Trait" order by "Trait";',sep="")         
         bbta_traitList<-dbGetQuery(con, bbta_traitQuery)
+        #-Get number of taxon and obs for the selected trait
+        TobsNb<-dbGetQuery(con, paste0('SELECT COUNT("Trait") as Obs_number FROM "Observation" where "Taxon_name" = ',sQuote(input$bbta_Taxon)))
+        traitNb<-dbGetQuery(con,paste0('SELECT COUNT(DISTINCT "Trait") as Trait_number FROM "Observation" where "Taxon_name" =',sQuote(input$bbta_Taxon)))
         dbDisconnect(con)
+        
+        #-Merge nb of trait and nb of obs
+        tnb_table<-cbind(traitNb,TobsNb)
+        tnb_table$obs_number<-as.integer(tnb_table$obs_number)
+        tnb_table$trait_number<-as.integer(tnb_table$trait_number)
+        colnames(tnb_table)<-c("Traits","Observations")
         bbta_traitList$count<-as.integer(bbta_traitList$count)
+        output$nbta_table<-renderTable(tnb_table,striped = T,hover = T,bordered = T)
         output$bbta_title<-renderText(HTML(paste0("Available data for <b>",input$bbta_Taxon,"</b>")))
         output$bbta_table<-renderTable(bbta_traitList,striped = T,hover = T,bordered = T)
     } else{output$bbta_table<-renderTable(NULL)
-          output$bbta_title<-renderText(NULL)}
+          output$bbta_title<-renderText(NULL)
+          output$nbta_table<-renderText(NULL)}
   },ignoreNULL = FALSE)
     
   #################################################    
