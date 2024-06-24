@@ -7,6 +7,25 @@
 <font size ="4">We recommend to use the Control Find shortcut (Ctrl+F) to search for a field</font>
 
 <br><br/>
+<button onclick="window.scrollTo(0, 435)">Contact</button>
+<button onclick="window.scrollTo(0, 1780)">General information</button>
+<button onclick="window.scrollTo(0, 4035)">Taxonomy essentials</button>
+<button onclick="window.scrollTo(0, 8005)">Taxonomy extended</button>
+<button onclick="window.scrollTo(0, 9900)">Domestication set</button>
+<button onclick="window.scrollTo(0, 12260)">Breeding</button>
+<button onclick="window.scrollTo(0, 13190)">Collecting site</button>
+<button onclick="window.scrollTo(0, 15330)">Plant material</button>  
+<button onclick="window.scrollTo(0, 15800)">International database</button>
+<button onclick="window.scrollTo(0, 17150)">Core collection</button>
+<button onclick="window.scrollTo(0, 17850)">Sampling site</button>
+<button onclick="window.scrollTo(0, 19395)">Experimental conditions</button>
+<button onclick="window.scrollTo(0, 23835)">Treatment</button>
+<button onclick="window.scrollTo(0, 24850)">Observation</button>
+<button onclick="window.scrollTo(0, 26920)">Measurement</button>
+<button onclick="window.scrollTo(0, 28980)">Human uses</button>
+
+
+<br><br/>
 
 ### Contact
 <hr style="height:2px;color:green;background-color:green">
@@ -1174,7 +1193,7 @@
 
 <hr style="height:2px;color:green;background-color:green">
 
-### Treatments
+### Treatment
 
 | <font size ="5">Treatment_type |                                    |
 | -----------------------------------| ---------------------------------- |
