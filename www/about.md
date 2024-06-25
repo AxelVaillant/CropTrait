@@ -3,7 +3,7 @@
 <br /><font size ="4"> The CropTraits Database, defined as a multiple-crops database, focuses on ecophysiological traits related to resource use and acquisition of cultivated plants. The main goal of the database is to analyse if the functional profile (phenotypic space) of domesticated species is similar to that of wild plants.</font>
 
 ### Cite the application
-<br /><font size ="4">"CropTraits, A. Vaillant, CEFE-CNRS, 2023"</font>
+<br /><font size ="4">"CropTraits, A. Vaillant, CEFE-CNRS, 2024"</font>
 
 ### Contact
 <br /><font size ="4"> PI of the project : Cyrille Violle - cyrille.violle@cefe.cnrs.fr</font>

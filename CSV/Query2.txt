@@ -1,0 +1,67 @@
+SELECT contact_s."Name" as sender_name,contact_s."Email" as sender_email, 
+	contact_p."Name" as PI_name,contact_p."Email" as PI_email,
+	contact_a."Name" as data_author_name,contact_a."Email" as data_author_email,
+	Geninfo."File_name",Geninfo."Source_data",Geninfo."Type_data",Geninfo."Data_access",Geninfo."Source_citation",Geninfo."Project_name",
+	Geninfo."Experiment_starting_date",Geninfo."Experiment_ending_date",Geninfo."Scientific_goal",
+	Taxess."Taxon_name",Taxess."Taxon_name_accepted",Taxess."Spauthor",Taxess."Family",Taxess."Genus",Taxess."Specie",
+	Taxess."CommonCropName",Taxess."Photos_type",Taxess."Functio_group",Taxess."Life_span",Taxess."Repro_type",Taxess."Heterozygosity",
+	Taxess."Ploidy_level",Taxess."Biogeografic_realm",Taxess."Ecoregion_name",
+	Taxext."Subtaxa",Taxext."Subauthor",Taxext."Variety",Taxext."Gen_name",Taxext."Select_type",Taxext."Tax_remarks",Taxext."Gen_status",
+	Domest."Name" as Domest_name,Domest."Stage" as Domest_stage,Domest."Progenitor_name1",Domest."Progenitor_name2",Domest."Progenitor_name3",
+	Domest."Progenitor_name4",Domest."Appear_date",Domest."Domest_location",Domest."Contact" as domest_contact,
+	Breeding."Breeding_name",Breeding."Breeding_country",Breeding."Breeding_url",Breeding."Registration_date",
+	Collsite."Collector_name",Collsite."Collector_contact",Collsite."Original_country",Collsite."Original_site",Collsite."Original_latitude",
+	Collsite."Original_longitude",Collsite."Original_elevation",Collsite."Collecting_source",Collsite."Collecting_date",
+	PlantM."Donor_name",PlantM."Donor_contact",
+	Interdb."International_id",Interdb."Base_name",Interdb."Base_url",Interdb."Base_version_num",Interdb."Hybrid_female_line",
+	Interdb."Hybrid_male_line",Corecoll."Name" as Corecoll_name,Corecoll."Ref" as Corecoll_ref,Corecoll."Contact" as Corecoll_contact,
+	Sampsite."Country" as Sampling_country,Sampsite."Site_name",Sampsite."Latitude" as Sampling_latitude,Sampsite."Longitude" as Sampling_longitude,
+	Sampsite."Elevation" as Sampling_elevation,Sampsite."Type" as Sampling_type,
+	Condexp."Soil_composition",Condexp."N_soil",Condexp."N_soil_unit",Condexp."Plant_density",Condexp."Plant_number",
+	Condexp."Mean_temperature_celsius",Condexp."Cumulative_GDD",Condexp."Water_condition",Condexp."Water_frequency",Condexp."Fertilization_condition",
+	Condexp."Fertilization_frequency",Condexp."Tillage_practice",Condexp."Pesticide_condition",Condexp."Culture_type",
+	Treatment."Treatment_type",Treatment."Treatment_quantity",Treatment."Treatment_quantity_unit",Treatment."Treatment_description",
+	Obs."Observation_levels",Trait."Name" as Trait,Trait."TOP_trait_id",Obs."Plant_identification",Obs."Bloc_identification",Obs."Original_value",
+	Obs."Original_unit",Obs."Standardized_value",Obs."Standardized_unit",
+	Meas."Method",Meas."Stage" as plant_stage,Meas."Organ",Meas."Leaf_age",Meas."Plant_age",Meas."Replicate_number",Meas."Std_value",
+	Dataset."Name" as Dataset,Hu."AnimalFood",Hu."EnvironmentalUses",Hu."Fuels",Hu."GeneSources",Hu."HumanFood",Hu."InverterbrateFood",
+	Hu."Materials",Hu."Medicines",Hu."Poisons",Hu."SocialUses",Hu."Total_uses"
+	FROM "Observation" as Obs 
+	JOIN "General_information" as Geninfo 
+		on Obs."General_informationId" = Geninfo."General_informationId" 
+	JOIN "Contact" as contact_s 
+		on contact_s."ContactId" = Geninfo."Sender"
+	JOIN "Contact" as contact_p
+		on contact_p."ContactId" = Geninfo."Project_PI"
+	JOIN "Contact" as contact_a 
+		on contact_a."ContactId" = Geninfo."Data_author"
+	JOIN "Taxonomy_essentials" as Taxess 
+		on Taxess."Taxon_name" = Obs."Taxon_name"
+	JOIN "Taxonomy_extended" as Taxext 
+		on Taxext."ExtendedTaxId" = Obs."Taxonomy_extended"
+	JOIN "Plant_material" as PlantM
+		on PlantM."Plant_materialId" = Geninfo."Plant_materialId"
+	JOIN "Domestication_set" as Domest
+		on Domest."DomesticationId" = PlantM."DomesticationId"
+	JOIN "Breeding" as Breeding
+		on Breeding."BreedingId" = PlantM."BreedingId"
+	JOIN "Collecting_site" as Collsite
+		on Collsite."Collecting_siteId" = PlantM."Collecting_site"
+	JOIN "Core_collection" as Corecoll
+		on Corecoll."Core_collectionId" = PlantM."Core_collectionId"
+	JOIN "International_database" as Interdb
+		on Interdb."InterDbId" = PlantM."International_id"
+	JOIN "Sampling_site" as Sampsite
+		on Sampsite."Sampling_siteId" = Geninfo."Sampling_site"
+	JOIN "Experimental_conditions" as Condexp
+		on Condexp."Experimental_conditionsId" = Geninfo."Experimental_conditions"
+	JOIN "Treatment" as Treatment
+		on Treatment."TreatmentId" = Condexp."TreatmentId"
+	JOIN "Trait" as Trait
+		on Trait."Name" = Obs."Trait"
+	JOIN "Measurement" as Meas
+		on Meas."MeasurementId" = Obs."Measurement"
+	JOIN "Dataset" as Dataset
+		on Dataset."Name" = Geninfo."Dataset"
+	JOIN "Human_uses" as Hu
+		on Hu."UsesId" = Taxess."UsesId";

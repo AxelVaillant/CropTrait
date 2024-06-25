@@ -1,57 +1,75 @@
 plan(multisession)
 function(input,output,session){
-  
+  options(useFancyQuotes = FALSE)
   #-------Get credentials----------------------#
-  credentials<-read.table(file = "credentials.csv",header = TRUE,sep = "\t")
+  credentials<-read.table(file = "CSV/credentials.csv",header = TRUE,sep = "\t")
   dbHost<-credentials$dbHost
   dbPort<-credentials$dbPort
   dbUser<-credentials$dbUser
   dbPassword<-credentials$dbPassword
   
   ###
-  resAll <-read.table("DB.csv",header = T,sep=";", dec=".", fill=T)
-  taxonTable <-read.table("taxon_Table.csv",header = F,sep=";", dec=".",quote='"', fill=FALSE)
-  taxonTableSpNb <-read.table("taxon_TableSpNb.csv",header = F,sep=";", dec=".",quote='"', fill=FALSE)
+  taxonTable <-read.table("CSV/taxon_Table.csv",header = F,sep=";", dec=".",quote='"', fill=FALSE)
+
   #######################################################
   ################-DATABASE MANAGEMENT-##################
   observe({
     tryCatch({
-        AllDataQuery <- paste(readLines("Query.txt"), collapse="\n")
-  #con <- dbConnect(RPostgres::Postgres(), dbname= "CropTrait", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
   con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
-
+  
+  ###-Database recap-###
+  recap_trait<-'SELECT count("Name") from "Trait";'
+  recap_obs<-'SELECT COUNT(*) from "Observation";'
+  recap_taxons<-'SELECT count("Taxon_name") from "Taxonomy_essentials";'
+    
+  res_traits<-dbGetQuery(con, recap_trait)
+  res_obs<-dbGetQuery(con, recap_obs)
+  res_taxons<-dbGetQuery(con, recap_taxons)
+  fieldName<-data.frame(c("Traits","Observations","Known taxons"))
+  colnames(fieldName)<-"Content"
+  fieldRes<-data.frame(c(res_traits$count,res_obs$count,res_taxons$count))
+  colnames(fieldRes)<-"Total"
+  recapList<-cbind(fieldName,fieldRes)
+  recapList$Total<-as.integer(recapList$Total)
+  output$recapTable<-renderTable(recapList,width=450,height=400,striped = T,hover = T,bordered = T)
+  
   ###-Selectize input-###
-  updateSelectizeInput(session, "taxons", choices = taxonTableSpNb[,1],server = T)
-  updateSelectizeInput(session, "dlTaxon", choices = taxonTableSpNb[,1],server = T)
+  TaxTabNb_query<-paste0('SELECT "Taxon_name", COUNT(*) from "Observation" group by "Taxon_name" order by "Taxon_name";')
+  resTaxTableNb<-dbGetQuery(con, TaxTabNb_query)
+  TaxTabNb<-data.frame()
+  for(i in 1:length(resTaxTableNb$Taxon_name)){
+    x<-paste0(resTaxTableNb$Taxon_name[i],"-",resTaxTableNb$count[i])
+    TaxTabNb<-rbind(TaxTabNb,x)
+  }
+  updateSelectizeInput(session, "taxons", choices = TaxTabNb[,1],server = T)
+  updateSelectizeInput(session, "dlTaxon", choices = TaxTabNb[,1],server = T)
 
   #####-Picker input-#####
-  functio_group_query<-"SELECT DISTINCT info->>'functio_group' as Fonctional_group FROM croptrait  ORDER BY info->>'functio_group';"
+  functio_group_query<-'SELECT DISTINCT "Functio_group" as Functional_group FROM "Taxonomy_essentials"  ORDER BY "Functio_group";'
   functio_group<-dbGetQuery(con, functio_group_query)
   updatePickerInput(session, "Functional_group", choices = functio_group)
   updatePickerInput(session, "dlFunctional_group", choices = functio_group)
 
-  sampling_type_query<-"SELECT DISTINCT info->>'sampling_type' as Sampling_type FROM croptrait  ORDER BY info->>'sampling_type';"
+  sampling_type_query<-'SELECT DISTINCT "Type" as Sampling_type FROM "Sampling_site"  ORDER BY "Type";'
   sampling_type<-dbGetQuery(con, sampling_type_query)
   updatePickerInput(session, "sampling_type", choices = sampling_type)
   updatePickerInput(session, "dlSampling_type", choices = sampling_type)
   
 
-  trait_query<-"SELECT DISTINCT info->>'trait_name' as trait_name FROM croptrait  ORDER BY info->>'trait_name';"
+  trait_query<-'SELECT DISTINCT "Name" as trait_name FROM "Trait"  ORDER BY "Name";'
   traits<-dbGetQuery(con, trait_query)
   updatePickerInput(session, "dlTraits", choices = traits)
   updateSelectInput(session, "varTraits", choices = traits)
   updatePickerInput(session, "bbtr_Traits", choices = c("",traits))
   
-  scale_query<-"SELECT DISTINCT info->>'observationLevels' as observationLevels FROM croptrait  ORDER BY info->>'observationLevels';"
+  scale_query<-'SELECT DISTINCT "Observation_levels" as observationLevels FROM "Observation"  ORDER BY "Observation_levels";'
   scaleRes<-dbGetQuery(con, scale_query)
   updatePickerInput(session, "dlScale", choices = scaleRes)
   
   ##-Browse database fields-##
-  bbta_functio_group_query<-"SELECT DISTINCT info->>'functio_group' as family FROM croptrait  ORDER BY info->>'functio_group';"
+  bbta_functio_group_query<-'SELECT DISTINCT "Functio_group" as family FROM "Taxonomy_essentials"  ORDER BY "Functio_group";'
   bbta_functio_group<-dbGetQuery(con, bbta_functio_group_query)
   updatePickerInput(session, "bbta_functio_group", choices = bbta_functio_group)
-  
-  #resAll <<- dbGetQuery(conn = con,statement = AllDataQuery)
   
   dbDisconnect(con)
     })
@@ -63,19 +81,31 @@ function(input,output,session){
   observeEvent(input$bbtr_Traits,{
     if(length(input$bbtr_Traits)>0 && input$bbtr_Traits!=""){
         con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
-        bbtr_taxonQuery<-paste("SELECT info->>'genus' as genus, info->>'species' as species, count(*) FROM croptrait where info->>'trait_name' in ('",
-                               paste(input$bbtr_Traits, collapse = "' ,'"),"') GROUP BY info->>'genus', info->>'species' ORDER BY info->>'genus';",sep="")
+        bbtr_taxonQuery<-paste('SELECT "Taxon_name", count(*) FROM "Observation" where "Trait" in (',sQuote(paste(input$bbtr_Traits, collapse = "' ,'")),')
+        GROUP BY "Taxon_name" ORDER BY "Taxon_name";',sep="")
         bbtr_taxonList<-dbGetQuery(con, bbtr_taxonQuery)
+        #-Get number of taxon and obs for the selected trait
+        obsNb<-dbGetQuery(con, paste0('SELECT COUNT("Taxon_name") as Observation_number FROM "Observation" where "Trait" = ',sQuote(input$bbtr_Traits)))
+        taxonNb<-dbGetQuery(con,paste0('SELECT COUNT(DISTINCT "Taxon_name") as Taxon_number FROm "Observation" where "Trait" =',sQuote(input$bbtr_Traits)))
         dbDisconnect(con)
+        
         bbtr_dynamicList<-data.frame(matrix(nrow=0,ncol=0))
         for(i in 1:length(bbtr_taxonList$genus)){
           bbtr_dynamicList<-rbind(bbtr_dynamicList,paste(bbtr_taxonList[i,1],bbtr_taxonList[i,2],sep=" "))
         }
+        #-Merge nb of taxon and nb of obs
+        nb_table<-cbind(taxonNb,obsNb)
+        nb_table$taxon_number<-as.integer(nb_table$taxon_number)
+        nb_table$observation_number<-as.integer(nb_table$observation_number)
+        colnames(nb_table)<-c("Taxons","Observations")
         bbtr_taxonList$count<-as.integer(bbtr_taxonList$count)
         output$bbtr_table<-renderTable(bbtr_taxonList,striped = T,hover = T,bordered = T)
         output$bbtr_title<-renderText(HTML(paste0("Available data for <b>",input$bbtr_Traits,"</b>")))
+        output$nbtr_table<-renderTable(nb_table,striped = T,hover = T,bordered = T)
+        
     } else{output$bbtr_table<-renderTable(NULL)
           output$bbtr_title<-renderText(NULL)
+          output$nbtr_table<-renderTable(NULL)
 }
   },ignoreNULL = FALSE)
   
@@ -83,32 +113,38 @@ function(input,output,session){
     observeEvent(input$bbta_functio_group,{
     if(length(input$bbta_functio_group)>0){
         con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
-        bbta_taxonQuery<-paste("SELECT DISTINCT info->>'genus' as genus, info->>'species' as species FROM croptrait where info->>'functio_group' in ('",
-                               paste(input$bbta_functio_group, collapse = "' ,'"),"') ORDER BY info->>'genus';",sep="")
+        bbta_taxonQuery<-paste('SELECT DISTINCT T1."Taxon_name" as ObsTax FROM "Observation" as T1 INNER JOIN "Taxonomy_essentials" as T2 on 
+                               T1."Taxon_name" = T2."Taxon_name" AND T2."Functio_group" in (',sQuote(paste(input$bbta_functio_group, collapse = "' ,'")),
+                               ') ORDER BY T1."Taxon_name";',sep="")
         bbta_taxonList<-dbGetQuery(con, bbta_taxonQuery)
         dbDisconnect(con)
-        test<<-bbta_taxonList[,2]
-        bbta_dynamicList<-data.frame(matrix(nrow=0,ncol=0))
-        for(i in 1:length(bbta_taxonList$genus)){
-          bbta_dynamicList<-rbind(bbta_dynamicList,paste(bbta_taxonList[i,1],bbta_taxonList[i,2],sep=" "))
-        }
-        updateSelectizeInput(session, "bbta_Taxon", choices = c("",bbta_dynamicList[,1]),server = T)
+        updateSelectizeInput(session, "bbta_Taxon", choices = c("",bbta_taxonList[,1]),server = T)
     } else{updateSelectizeInput(session, "bbta_Taxon", choices = "")}
   },ignoreNULL = FALSE)
     
     observeEvent(input$bbta_Taxon,{
     if(length(input$bbta_Taxon)>0 && input$bbta_Taxon!=""){
-        selectedTaxon<-NameSpliter(input$bbta_Taxon)
         con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
-        bbta_traitQuery<-paste("SELECT info->>'trait_name' as trait_name, count(*) FROM croptrait where info->>'species' in ('",
-                               paste(selectedTaxon$allSpecie, collapse = "' ,'"),"')  group by info ->> 'trait_name' ORDER BY info->>'trait_name';",sep="")        
+        bbta_traitQuery<-paste('SELECT  "Trait", count(*) FROM "Observation" where "Taxon_name" in (',sQuote(paste(input$bbta_Taxon, collapse = "' ,'")),
+                               ') GROUP BY "Trait" order by "Trait";',sep="")         
         bbta_traitList<-dbGetQuery(con, bbta_traitQuery)
+        #-Get number of taxon and obs for the selected trait
+        TobsNb<-dbGetQuery(con, paste0('SELECT COUNT("Trait") as Obs_number FROM "Observation" where "Taxon_name" = ',sQuote(input$bbta_Taxon)))
+        traitNb<-dbGetQuery(con,paste0('SELECT COUNT(DISTINCT "Trait") as Trait_number FROM "Observation" where "Taxon_name" =',sQuote(input$bbta_Taxon)))
         dbDisconnect(con)
+        
+        #-Merge nb of trait and nb of obs
+        tnb_table<-cbind(traitNb,TobsNb)
+        tnb_table$obs_number<-as.integer(tnb_table$obs_number)
+        tnb_table$trait_number<-as.integer(tnb_table$trait_number)
+        colnames(tnb_table)<-c("Traits","Observations")
         bbta_traitList$count<-as.integer(bbta_traitList$count)
+        output$nbta_table<-renderTable(tnb_table,striped = T,hover = T,bordered = T)
         output$bbta_title<-renderText(HTML(paste0("Available data for <b>",input$bbta_Taxon,"</b>")))
         output$bbta_table<-renderTable(bbta_traitList,striped = T,hover = T,bordered = T)
     } else{output$bbta_table<-renderTable(NULL)
-          output$bbta_title<-renderText(NULL)}
+          output$bbta_title<-renderText(NULL)
+          output$nbta_table<-renderText(NULL)}
   },ignoreNULL = FALSE)
     
   #################################################    
@@ -116,13 +152,9 @@ function(input,output,session){
   observeEvent(input$varTraits,{
     if(input$varTraits!=""){
         con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
-        taxonQuery<-paste("SELECT DISTINCT info->>'genus' as genus, info->>'species' as species FROM croptrait where info->>'trait_name'='",input$varTraits,"';",sep="")
+        taxonQuery<-paste('SELECT DISTINCT "Taxon_name" FROM "Observation" WHERE "Trait"=',sQuote(input$varTraits),' ORDER BY "Taxon_name";',sep="")
         taxonList<-dbGetQuery(con, taxonQuery)
-        dynamicList<-data.frame(matrix(nrow=0,ncol=0))
-        for(i in 1:length(taxonList$genus)){
-          dynamicList<-rbind(dynamicList,paste(taxonList[i,1],taxonList[i,2],sep=" "))
-        }
-        updateSelectizeInput(session, "varSpecies", choices = c("",dynamicList[,1]),server = T)
+        updateSelectizeInput(session, "varSpecies", choices = c("",taxonList$Taxon_name),server = T)
         dbDisconnect(con)
     }
   })
@@ -131,7 +163,7 @@ function(input,output,session){
   ##############################################################################
   
   ####-GLOPNET-####
-    GLOPNET <-read.table("GLOPNETdata.csv",header = T,sep=";", dec=".",quote="", fill=FALSE)
+    GLOPNET <-read.table("CSV/GLOPNETdata.csv",header = T,sep=";", dec=".",quote="", fill=FALSE)
     str(GLOPNET)
     GLOPNET$LMA <- 10^(GLOPNET$log.LMA) #g/m2
     GLOPNET$LMA <- GLOPNET$LMA *10^-3 #kg/m2
@@ -141,20 +173,6 @@ function(input,output,session){
 
     ###-Reactive data for plotting-###
     myReact <- reactiveValues()
-
-        ###-Asynchrone-###
- #  observeEvent(input$visualizeR,{
- #    future_promise({
- #      return((concatenateQuery()))
- #    }) %...>%(function(Sample){
- #      genList<-traitSplitByInd(Sample)
- #      myReact$toPlot<-rbind(myReact$toPlot,genList) 
- #      })%...!%(function(error){
- #      myReact$toPlot<-NULL
- #      warning("Plot Error")
- #    }) 
- #    })
-    
     
     ###-Add one condition to plot-###
     observeEvent(input$visualize,{
@@ -238,46 +256,61 @@ function(input,output,session){
   #############################################################
   concatenateQuery<-function(){
   visuInputList<-list(input$taxons,input$Functional_group,input$sampling_type)
-  visuInputNames<-c("taxon","functio_group","sampling_type")
-  ####-REMPLACER FOR LOOP PAR APPLY
+  visuInputNames<-c("Taxon_name","Functio_group","Type")
+  con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
   visuQuery<-NULL
+  #-Check if at least one filtered is used
   if(!is.null(c(visuInputList[[1]],visuInputList[[2]],visuInputList[[3]]))){
   for(i in 1:length(visuInputList)){
     if(!is.null(visuInputList[i][[1]])){
       ###particular case for taxons
       if(i==1){
-        dfTaxons<-NameSpliter(input$taxons)
-        if(length(dfTaxons$allGenus)==1){
-        genusQuery<-paste(noquote("genus %in% "),sQuote(dfTaxons$allGenus,F),sep=" ")
-        specieQuery<-  paste(noquote("species %in% "),sQuote(dfTaxons$allSpecie,F),sep=" ")
+        dfTaxons<-NameSpliterRela(input$taxons)
+        if(length(dfTaxons$allTax)==1){
+          query <- paste0('Obs."Taxon_name" IN (',sQuote(dfTaxons$allTax),')')
         } else {
-        genusQuery<-paste(noquote("genus %in% "),list(dfTaxons$allGenus),sep=" ")
-        specieQuery<-  paste(noquote("species %in% "),list(dfTaxons$allSpecie),sep=" ")
+          query<-noquote(paste(noquote(list(dfTaxons$allTax)),collapse=","))
+          query<-str_replace_all(query,'"',"'")
+          query<-substr(query,2,nchar(query))
+          query <- paste0('Obs."Taxon_name" IN ',query)
         }
-        query<-paste(genusQuery,specieQuery,sep=" & ")
       } else {
         ###functio_group and sampling_type
          if(length(visuInputList[i][[1]])==1){
-           query <- paste(noquote(visuInputNames[i])," %in% ",sQuote(visuInputList[i],F),sep=" ")
+          query <- paste0(dQuote(visuInputNames[i]), " IN ('",visuInputList[i],"')")
          } else {
-           query <- paste(noquote(visuInputNames[i])," %in% ",visuInputList[i],sep=" ")
+           filter<-noquote(paste(visuInputList[i],collapse=","))
+           filter<-str_replace_all(filter,'"',"'")
+           filter<-substr(filter,2,nchar(filter))
+           query <- paste0(dQuote(visuInputNames[i]), " IN ",filter)
          }
       }
       if(is.null(visuQuery)){
         visuQuery<-query
       } else {
-        visuQuery<-paste(visuQuery,query,sep = " & ")
+        visuQuery<-paste(visuQuery,query,sep = " AND ")
       }
           }
   }
   if(!is.null(visuQuery)){
     ###filtering
-      Sample<- resAll %>% filter(!! rlang::parse_expr(visuQuery))
-      return(Sample)
+      query<-paste0('SELECT Obs."Taxon_name","Standardized_value","Standardized_unit","Original_value","Trait","Gen_name","Subtaxa","Plant_identification" from "Observation" as Obs 
+                    	JOIN "General_information" ON Obs."General_informationId" = "General_information"."General_informationId" 
+	                    JOIN "Sampling_site" ON "Sampling_site"."Sampling_siteId" = "General_information"."Sampling_site"
+	                    JOIN "Taxonomy_essentials" as Taxess ON Taxess."Taxon_name" = Obs."Taxon_name" 
+                      JOIN "Taxonomy_extended" as Taxext ON Taxext."ExtendedTaxId" = Obs."Taxonomy_extended" WHERE ',visuQuery)
+      res<-dbGetQuery(con, query)
+      return(res)
   } else { return(NULL)}
+    #-Case when no filters have been selected so all data are selected
   } else {
-    return(resAll)
+    AllDataQuery <- paste(readLines("CSV/Query2.txt"), collapse=" ")
+    #-Query to retrieve the whole database
+    res<-dbGetQuery(con, AllDataQuery)
+    names(res)[names(res) == "trait"] <- "Trait"
+    return(res)
   }
+  dbDisconnect(con)
     }
   ##########################################################
   ##########-Print database matching results-###########
@@ -320,7 +353,7 @@ function(input,output,session){
   ##########-Filtering by genotypes-###########
   traitSplit<-function(Sample){
   filterLegend<-legendHandler()  
-  genotypes<-Sample %>% distinct(gen_name)
+  genotypes<-Sample %>% distinct(Gen_name)
   genotypes<-drop_na(genotypes)
   genList<-data.frame(matrix(ncol=5,nrow=0))
   colnames(genList) <-c('meanSLA','meanLNC','filterName',"taxon","variety")
@@ -329,16 +362,17 @@ function(input,output,session){
   genList$variety<-as.character(genList$variety)
   if(!is.na(genotypes[1,])){
   for (i in 1:length(genotypes[[1]])){
-    genSample <- filter (Sample,gen_name==genotypes[[1]][i])
-    genSample$standardized_value <- as.double(genSample$standardized_value)
-    genSample <- genSample %>% drop_na(standardized_value)
-    genSampleSLA<-filter(genSample,trait_name == "Specific leaf area")
-    genSampleLNC<-filter(genSample,trait_name == "LNC per leaf dry mass")
+    genSample <- filter (Sample,Gen_name==genotypes[[1]][i])
+    genSample$Standardized_value <- as.double(genSample$Standardized_value)
+    genSample <- genSample %>% drop_na(Standardized_value)
+    genSampleSLA<-filter(genSample,Trait == "Specific leaf area")
+    genSampleLNC<-filter(genSample,Trait == "LNC per leaf dry mass")
     if(length(genSampleSLA[[1]])>0 && length(genSampleLNC[[1]]>0)){
-      #genSampleSLA<-normalize(genSampleSLA)
-      genList<-genList %>% add_row(meanSLA = mean(genSampleSLA$standardized_value), meanLNC = mean(genSampleLNC$original_value), filterName = filterLegend,taxon = paste(genSample[1,]$genus,genSample[1,]$species,sep=" "), variety = genSample[1,]$subtaxa)
+      #-We have both SLA and LNC value so we add a new row to the dataframe
+      genList<-genList %>% add_row(meanSLA = mean(genSampleSLA$Standardized_value), meanLNC = mean(genSampleLNC$Original_value), filterName = filterLegend,taxon = genSample[1,]$Taxon_name, variety = genSample[1,]$Subtaxa)
     }
   }
+  #-Log scale for better visualization  
   genList$meanSLA<-log10(genList$meanSLA)
   genList$meanLNC<-log10(genList$meanLNC)
   }
@@ -355,47 +389,40 @@ function(input,output,session){
   indList$taxon<-as.character(indList$taxon)
   indList$variety<-as.character(indList$variety)
     indSample <-Sample
-    indSample$standardized_value <- as.double(indSample$standardized_value)
-    indSample <- indSample %>% drop_na(standardized_value)
-    indSampleSLA<-filter(indSample,trait_name == "Specific leaf area")
-    indSampleLNC<-filter(indSample,trait_name == "LNC per leaf dry mass")
+    indSample$Standardized_value <- as.double(indSample$Standardized_value)
+    indSample <- indSample %>% drop_na(Standardized_value)
+    indSampleSLA<-filter(indSample,Trait == "Specific leaf area")
+    indSampleLNC<-filter(indSample,Trait == "LNC per leaf dry mass")
     if(length(indSampleSLA[[1]])>0 && length(indSampleLNC[[1]]>0)){
-      matchingInd<-intersect(indSampleLNC$id_occurence,indSampleSLA$id_occurence)
+      #-Find matching individual by Plant identification
+      matchingInd<-intersect(indSampleLNC$Plant_identification,indSampleSLA$Plant_identification)
       if(length(matchingInd)>0){
     if(length(indSampleSLA[,1]) != length(indSampleLNC[,1])){
+      #-If size is different we have to find the matching individuals
       if(length(matchingInd)>0){
       for(i in 1:length(matchingInd)){
-      indexSLA<- match(matchingInd[i],indSampleSLA$id_occurence)
-      indexLNC<- match(matchingInd[i],indSampleLNC$id_occurence)
-      indList<-indList %>% add_row(meanSLA = indSampleSLA[indexSLA,]$standardized_value, meanLNC = indSampleLNC[indexLNC,]$original_value, filterName = filterLegend, taxon = paste(indSampleSLA[indexSLA,]$genus,indSampleSLA[indexSLA,]$species,sep=" "), variety = indSampleSLA[indexSLA,]$subtaxa)
+      indexSLA<- match(matchingInd[i],indSampleSLA$Plant_identification)
+      indexLNC<- match(matchingInd[i],indSampleLNC$Plant_identification)
+      indList<-indList %>% add_row(meanSLA = indSampleSLA[indexSLA,]$Standardized_value, meanLNC = indSampleLNC[indexLNC,]$Original_value, filterName = filterLegend, taxon = indSampleSLA[indexSLA,]$Taxon_name, variety = indSampleSLA[indexSLA,]$Subtaxa)
       }}
     } else {
+      #If size is similar we can add all individuals
         for (i in 1:length(Sample[,1])){
-          indList<-indList %>% add_row(meanSLA = indSampleSLA[i,]$standardized_value, meanLNC = indSampleLNC[i,]$original_value, filterName = filterLegend, taxon = paste(indSampleSLA[indexSLA,]$genus,indSampleSLA[indexSLA,]$species,sep=" "), variety = indSampleSLA[i,]$subtaxa)
+          indList<-indList %>% add_row(meanSLA = indSampleSLA[i,]$Standardized_value, meanLNC = indSampleLNC[i,]$Original_value, filterName = filterLegend, taxon = indSampleSLA[i,]$Taxon_name, variety = indSampleSLA[i,]$Subtaxa)
         }
     }
       }}
+  #-Log scale for better visualization
   indList$meanSLA<-log10(indList$meanSLA)
   indList$meanLNC<-log10(indList$meanLNC)
   ##
   return(indList)
   }
   
-  normalize<-function(dataset){
-  for(i in 1:length(dataset[,1])){
-    if(dataset[i,]$original_unit == "cm2/g"){
-      dataset[i,]$original_value <- dataset[i,]$original_value/10
-    }
-    if(dataset[i,]$original_unit == "cm2/mg"){
-      dataset[i,]$original_value <- dataset[i,]$original_value*100
-    }
-  }
-  return(dataset)
-  }
-  
   legendHandler<-function(){
         filterUsed<-c(input$taxons,input$Functional_group,input$sampling_type)
         legendText<-NULL
+        if(length(filterUsed)>0){
         for(i in 1:length(filterUsed)){
           #-Cut Numbers-#
           splited<- strsplit(filterUsed[i],"-") 
@@ -406,7 +433,8 @@ function(input,output,session){
             legendText<-paste(legendText,fixedLegend,sep = " & ")
           }
         }
-        legendText <- gsub("&","& \n",legendText)
+        legendText <- gsub("&","& \n",legendText)          
+        }
         return(legendText)
   }
   ###-Reset Plot-###
@@ -455,20 +483,23 @@ function(input,output,session){
   #########################-Trait variability-############################
   ########################################################################
     output$traitVariability<-renderPlot({
-      trait <- resAll %>% filter(trait_name == input$varTraits)
+      con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
+      query<-paste0('SELECT "Taxon_name","Standardized_value","Standardized_unit","Trait" from "Observation" WHERE "Trait"=',sQuote(input$varTraits))
+      trait<-dbGetQuery(con, query)
+      dbDisconnect(con)      
       if(length(trait[,1]) > 0){
       #-building dataframe for general traits values-#  
-      dfTrait <-data.frame(value = trait$standardized_value, unit = trait$standardized_unit, condition = trait$trait_name, dataset = "trait")
+      dfTrait <-data.frame(value = trait$Standardized_value, unit = trait$Standardized_unit, condition = trait$Trait, dataset = "trait")
+      #-Special case
       if(input$varTraits!="Leaf Thickness"){
        dfTrait<-removeOutliers(dfTrait) 
       }
       if(input$varSpecies!=""){
       #-filter specific taxon values for the trait-#  
-      splitedTaxon<-NameSpliter(input$varSpecies)
-      specie <- trait %>% filter(genus == splitedTaxon$allGenus & species == splitedTaxon$allSpecie)
+      specie <- trait %>% filter(Taxon_name==input$varSpecies)  
       if(length(specie[,1]) > 0){
       #-dataframes concatenation-#  
-      dfTax<-data.frame(value = specie$standardized_value, unit = specie$standardized_unit, condition = specie$taxon, dataset = "taxon")
+      dfTax<-data.frame(value = specie$Standardized_value, unit = specie$Standardized_unit, condition = specie$Taxon_name, dataset = "taxon")
       dfTrait<-rbind(dfTrait,dfTax)
       dfTrait$dataset <-factor(dfTrait$dataset,levels=c("trait","taxon"))
       #-Plotting parameters-#
@@ -487,12 +518,14 @@ function(input,output,session){
       }
       }
       })
-  
+  #-Update trait variability results upon change of Specie/Traits selected-#
   observeEvent(c(input$varSpecies,input$varTraits),{
-    trait <- resAll %>% filter(trait_name == input$varTraits)
+      con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
+      query<-paste0('SELECT "Taxon_name","Standardized_value","Standardized_unit","Trait" from "Observation" WHERE "Trait"=',sQuote(input$varTraits))
+      trait<-dbGetQuery(con, query)
+      dbDisconnect(con)   
     if(input$varSpecies!=""){
-      splitedTaxon<-NameSpliter(input$varSpecies)
-      specie <- trait %>% filter(genus == splitedTaxon$allGenus & species == splitedTaxon$allSpecie)
+      specie <- trait %>% filter(Taxon_name==input$varSpecies)  
       taxonByTraitResult(specie)
     } else {
       taxonByTraitResult(trait)
@@ -512,6 +545,7 @@ function(input,output,session){
   ########################################################################
   #############################-Download Data-############################
   ########################################################################
+  #-----------------------#
   ###-Concatenate query-###
   dbManagement<- function(con){
   filterList<-NULL
@@ -519,21 +553,23 @@ function(input,output,session){
   allSpecie<-NULL
   inputs<-NULL
   inputList<-list(input$dlTaxon,input$dlScale,input$dlTraits,input$dlFunctional_group,input$dlSampling_type)
-  inputNameList<-list("taxon","observationLevels","trait_name","functio_group","sampling_type")
+  inputNameList<-list("Obs.Taxon_name","Observation_levels","Trait","Functio_group","Type")
   for(i in 1:length(inputList)){
     if(!is.null(inputList[i][[1]]) &&  !inputList[i]==""){
+      #-Special case for Taxon name
       if(i==1){
-        splited<-NameSpliter(input$dlTaxon)
-        for(iterator in 1:length(splited$allGenus)){
-          splited$allGenus[iterator]<-sQuote(splited$allGenus[iterator],F)
-          splited$allSpecie[iterator]<-sQuote(splited$allSpecie[iterator],F)
-        }
-        filterList<-c(filterList,paste(" info ->>'genus' in (",paste(splited$allGenus,collapse=","),")",sep=""))
-        filterList<-c(filterList,paste(" info ->>'species' in (",paste(splited$allSpecie,collapse=","),")",sep=""))
+      for(j in 1:length(inputList[i][[1]])){
+        split=strsplit(inputList[i][[1]][j],"-")
+        inputList[i][[1]][j]<-split[[1]][1]
+      }  
+        inputList[i][[1]]<-sapply(strsplit(inputList[i][[1]],","), function(x) toString(sQuote(x,F)))
+        inputs<-paste(inputList[i][[1]],collapse=",")
+        filterList<-c(filterList,paste('Obs."Taxon_name" in (',inputs,')',sep=""))
       } else {
-      inputList[i][[1]]<-sapply(strsplit(inputList[i][[1]],","), function(x) toString(sQuote(x,F)))
-      inputs<-paste(inputList[i][[1]],collapse=",")
-      filterList<-c(filterList,paste(" info ->>'",inputNameList[i],"' in (",inputs,")",sep=""))
+        #-Case for the other filters
+        inputList[i][[1]]<-sapply(strsplit(inputList[i][[1]],","), function(x) toString(sQuote(x,F)))
+        inputs<-paste(inputList[i][[1]],collapse=",")
+        filterList<-c(filterList,paste('"',inputNameList[i],'" in (',inputs,')',sep=""))
       }
     }
   }  
@@ -544,44 +580,44 @@ function(input,output,session){
   #######################
   #-Taxon name spliter-#
   #######################
-    NameSpliter<-function(list){
-    allGenus<-NULL
-    allSpecie<-NULL
+    NameSpliterRela<-function(list){
+        allTax<-NULL
         for(j in 1:length(list)){
-        splited<- strsplit(list[j]," ")
-        genus<-splited[[1]][1]
-        splited2<-strsplit(splited[[1]][2],"-")
-        specie<-splited2[[1]][1]
-        allGenus<-c(allGenus,genus)
-        allSpecie<-c(allSpecie,specie)
+        splited<- strsplit(list[j],"-")
+        taxon<-splited[[1]][1]
+        allTax<-c(allTax,taxon)
         }
-        df<-data.frame(allGenus,allSpecie)
+        df<-data.frame(allTax)
         return(df)
-      }  
+    } 
+  ##########################
+  #-Get data main process -#
+  ##########################
   observeEvent(input$runQuery,{
     system(paste("mkdir ",session$token,sep = ""))
     shinyjs::hide("queryDl")
     withProgress(message="Browsing database",detail = "Please wait", value = 0,{
       incProgress(1/5)
-    #con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host="localhost", port=dbPort, user="postgres", password="Sonysilex915@")
     con <- dbConnect(RPostgres::Postgres(), dbname= "croptrait", host=dbHost, port=dbPort, user=dbUser, password=dbPassword)
     filterList<-dbManagement(con)
-    AllDataQuery <- paste(readLines("Query.txt"), collapse=" ")
+    #-Load fixed SQL syntax
+    AllDataQuery <- paste(readLines("CSV/Query2.txt"), collapse=" ")
     if(!filterList==""){
       ifelse(isTRUE(adminMode$isAdmin),
-             filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"WHERE",filterList," ORDER BY info->>'id_bdd';",sep =" "),
-             filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"WHERE info->>'data_access' in ('Public','Public (notify the PIs)') and",filterList," ORDER BY info->>'id_bdd';",sep =" "))
+             filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"WHERE",filterList,sep =" "),
+             filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),'WHERE Geninfo."Data_access" in (',sQuote("Public"),",",sQuote("Public (notify the PIs)"),');',sep =" "))
       print(filteredQuery)
     } else {
+    #-Case with 0 filters -> get the whole database
       ifelse(isTRUE(adminMode$isAdmin),
-             filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"ORDER BY info->>'id_bdd';",sep =" "),
-             filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),"WHERE info->>'data_access' in ('Public','Public (notify the PIs)') ORDER BY info->>'id_bdd';",sep =" "))
+             filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),sep =" "),
+             filteredQuery<-paste(substr(AllDataQuery,1,nchar(AllDataQuery)-1),'WHERE Geninfo."Data_access" in (',sQuote("Public"),",",sQuote("Public (notify the PIs)"),');',sep =" "))
       }
     incProgress(1/2)
     res <<- dbGetQuery(conn = con,statement = filteredQuery)
     dbDisconnect(con)
-    
-    userData<<- res %>% filter(data_access == "Public (notify the PIs)")
+    #-Check if we have to inform PI about their data downloaded
+    userData<<- res %>% filter(Data_access == "Public (notify the PIs)")
     if(length(userData[,1])>0 & !isTRUE(adminMode$isAdmin)){
       shinyjs::show("userInfos")
     } else {
@@ -592,16 +628,10 @@ function(input,output,session){
     })
   })
   
-  taxonHandler<-function(taxonInput){
-    nospace<-str_replace_all(taxonInput,", ",",")
-    splited<- strsplit(nospace,",")
-    editedTaxonInput<-sapply(splited, function(x) toString(sQuote(x,FALSE)))
-    return(editedTaxonInput)
-  }
-  
   #####################################################
   ###############-Admin access to data#################
   observeEvent(input$dataAccessMode,{
+    #-Process to toggle the password field
     if(input$dataAccessMode == "Admin"){
       shinyjs::show("admin")
     } else {
@@ -617,7 +647,8 @@ function(input,output,session){
   adminMode$message<-""
   adminMode$isAdmin<-FALSE
   observeEvent(input$submitPswd,{
-    if(input$adminPswd == "croptraitpass2023"){
+  #-Process to switch in/out admin mode
+    if(input$adminPswd == credentials$adminpass){
       adminMode$message<- "Admin mode"
       adminMode$isAdmin<-TRUE
       shinyjs::hide("admin")
@@ -632,10 +663,11 @@ function(input,output,session){
   })
   #####################################################
   ###############-Check data access-###################
-  isInfosFilled<-observeEvent(input$submit,{
+  observeEvent(input$submit,{
     if(!input$userMail=="" && isValidEmail(input$userMail)){
       PiToContact<-userData %>% distinct(userData$pi_contact)
     for(i in 1:length(PiToContact[,1])){
+      #-Delete unwanted space characters
       nospace<- str_replace_all(PiToContact[i,1]," ","")
       splited<- strsplit(nospace,",")
       for(j in 1:length(splited[[1]])){
@@ -657,24 +689,28 @@ function(input,output,session){
   ############### DOWNLOAD HANDLING ###################
   uploadData <- function() {
     output$queryDl <- downloadHandler(
+      #-Give a name to the file
       filename = function() {
         paste("Dataset-", Sys.time(), ".csv", sep="")
       },
+      #-Give a location to the file
       content = function(file) {
         file.copy(paste(session$token,"/","queryRes.csv",sep=""),file)
       }
     )
   }
+      #-Handle download of the FieldDescription file located in the app
       output$fieldDesc <- downloadHandler(
       filename = "fieldsDescription.xlsx",
       content = function(file) {
         file.copy("fieldsDescription.xlsx",file)
       }
     )
+      #-Handle download of the taxon table file located in the app
       output$taxonTable <- downloadHandler(
-      filename = "taxon_Table.csv",
+      filename = "CSV/taxon_Table.csv",
       content = function(file) {
-        file.copy("taxon_Table.csv",file)
+        file.copy("CSV/taxon_Table.csv",file)
       }
     )
       
